@@ -557,4 +557,132 @@ mod tests {
         let merged = merge_contiguous_highlights(&[t1, t2, t3], DiffOpKind::Delete, false);
         assert_eq!(merged.len(), 2); // 1 span for line 0, 1 span for line 1
     }
+
+    #[test]
+    fn test_paragraph_reflow_insertion_no_false_positives() {
+        // Base paragraph across 2 lines:
+        // Line 0: "The quick brown fox"
+        // Line 1: "jumps over the lazy dog"
+        let b0_0 = make_token("The", 50.0, 750.0, 70.0, 762.0, 0);
+        let b0_1 = make_token("quick", 75.0, 750.0, 105.0, 762.0, 0);
+        let b0_2 = make_token("brown", 110.0, 750.0, 145.0, 762.0, 0);
+        let b0_3 = make_token("fox", 150.0, 750.0, 170.0, 762.0, 0);
+        let b1_0 = make_token("jumps", 50.0, 730.0, 85.0, 742.0, 1);
+        let b1_1 = make_token("over", 90.0, 730.0, 115.0, 742.0, 1);
+        let b1_2 = make_token("the", 120.0, 730.0, 140.0, 742.0, 1);
+        let b1_3 = make_token("lazy", 145.0, 730.0, 170.0, 742.0, 1);
+        let b1_4 = make_token("dog", 175.0, 730.0, 195.0, 742.0, 1);
+
+        // Tailored paragraph with "very" inserted on Line 0, causing "brown" and "fox" to wrap to Line 1:
+        // Line 0: "The very quick"
+        // Line 1: "brown fox jumps over the lazy dog"
+        let t0_0 = make_token("The", 50.0, 750.0, 70.0, 762.0, 0);
+        let t0_1 = make_token("very", 75.0, 750.0, 100.0, 762.0, 0); // Inserted
+        let t0_2 = make_token("quick", 105.0, 750.0, 135.0, 762.0, 0);
+        let t1_0 = make_token("brown", 50.0, 730.0, 85.0, 742.0, 1); // Wrapped
+        let t1_1 = make_token("fox", 90.0, 730.0, 110.0, 742.0, 1); // Wrapped
+        let t1_2 = make_token("jumps", 115.0, 730.0, 150.0, 742.0, 1);
+        let t1_3 = make_token("over", 155.0, 730.0, 180.0, 742.0, 1);
+        let t1_4 = make_token("the", 185.0, 730.0, 205.0, 742.0, 1);
+        let t1_5 = make_token("lazy", 210.0, 730.0, 235.0, 742.0, 1);
+        let t1_6 = make_token("dog", 240.0, 730.0, 260.0, 742.0, 1);
+
+        let base_page = PageText::new(
+            vec![b0_0, b0_1, b0_2, b0_3, b1_0, b1_1, b1_2, b1_3, b1_4],
+            612.0,
+            792.0,
+            0,
+        );
+        let tailored_page = PageText::new(
+            vec![t0_0, t0_1, t0_2, t1_0, t1_1, t1_2, t1_3, t1_4, t1_5, t1_6],
+            612.0,
+            792.0,
+            0,
+        );
+
+        let res = diff_documents(&[base_page], &[tailored_page], DiffGranularity::Word);
+        assert!(res.has_differences);
+        // Base should have ZERO highlights because nothing was deleted
+        assert!(
+            res.pages[0].base_highlights.is_empty(),
+            "Expected 0 base highlights, got: {:?}",
+            res.pages[0].base_highlights
+        );
+        // Tailored should have exactly 1 highlight covering only "very"
+        assert_eq!(
+            res.pages[0].tailored_highlights.len(),
+            1,
+            "Expected 1 tailored highlight for 'very', got: {:?}",
+            res.pages[0].tailored_highlights
+        );
+        assert_eq!(res.pages[0].tailored_highlights[0].op, DiffOpKind::Insert);
+    }
+
+    #[test]
+    fn test_paragraph_reflow_deletion_no_false_positives() {
+        // Base: Line 0 has "Software development lifecycle management", Line 1 has "practices and tooling"
+        let b0_0 = make_token("Software", 50.0, 750.0, 100.0, 762.0, 0);
+        let b0_1 = make_token("development", 105.0, 750.0, 170.0, 762.0, 0); // To delete
+        let b0_2 = make_token("lifecycle", 175.0, 750.0, 225.0, 762.0, 0); // To delete
+        let b0_3 = make_token("management", 230.0, 750.0, 300.0, 762.0, 0);
+        let b1_0 = make_token("practices", 50.0, 730.0, 105.0, 742.0, 1);
+        let b1_1 = make_token("and", 110.0, 730.0, 130.0, 742.0, 1);
+        let b1_2 = make_token("tooling", 135.0, 730.0, 180.0, 742.0, 1);
+
+        // Tailored: "development lifecycle" removed, "practices" pulled up to Line 0
+        let t0_0 = make_token("Software", 50.0, 750.0, 100.0, 762.0, 0);
+        let t0_1 = make_token("management", 105.0, 750.0, 175.0, 762.0, 0);
+        let t0_2 = make_token("practices", 180.0, 750.0, 235.0, 762.0, 0); // Pulled up
+        let t1_0 = make_token("and", 50.0, 730.0, 70.0, 742.0, 1);
+        let t1_1 = make_token("tooling", 75.0, 730.0, 120.0, 742.0, 1);
+
+        let base_page = PageText::new(
+            vec![b0_0, b0_1, b0_2, b0_3, b1_0, b1_1, b1_2],
+            612.0,
+            792.0,
+            0,
+        );
+        let tailored_page = PageText::new(vec![t0_0, t0_1, t0_2, t1_0, t1_1], 612.0, 792.0, 0);
+
+        let res = diff_documents(&[base_page], &[tailored_page], DiffGranularity::Word);
+        assert!(res.has_differences);
+        // Base should have exactly 1 merged highlight span covering "development lifecycle"
+        assert_eq!(
+            res.pages[0].base_highlights.len(),
+            1,
+            "Expected 1 merged base highlight, got: {:?}",
+            res.pages[0].base_highlights
+        );
+        assert_eq!(res.pages[0].base_highlights[0].op, DiffOpKind::Delete);
+        // Tailored should have 0 highlights
+        assert!(
+            res.pages[0].tailored_highlights.is_empty(),
+            "Expected 0 tailored highlights, got: {:?}",
+            res.pages[0].tailored_highlights
+        );
+    }
+
+    #[test]
+    fn test_inline_multiple_discrete_word_edits() {
+        // Base: "The red brown fox"
+        let b0 = make_token("The", 50.0, 750.0, 70.0, 762.0, 0);
+        let b1 = make_token("red", 75.0, 750.0, 95.0, 762.0, 0);
+        let b2 = make_token("brown", 100.0, 750.0, 135.0, 762.0, 0);
+        let b3 = make_token("fox", 140.0, 750.0, 160.0, 762.0, 0);
+
+        // Tailored: "The quick blue fox"
+        let t0 = make_token("The", 50.0, 750.0, 70.0, 762.0, 0);
+        let t1 = make_token("quick", 75.0, 750.0, 105.0, 762.0, 0);
+        let t2 = make_token("blue", 110.0, 750.0, 135.0, 762.0, 0);
+        let t3 = make_token("fox", 140.0, 750.0, 160.0, 762.0, 0);
+
+        let base_page = PageText::new(vec![b0, b1, b2, b3], 612.0, 792.0, 0);
+        let tailored_page = PageText::new(vec![t0, t1, t2, t3], 612.0, 792.0, 0);
+
+        let res = diff_documents(&[base_page], &[tailored_page], DiffGranularity::Word);
+        assert!(res.has_differences);
+        // "red brown" is replaced by "quick blue" -> 1 merged delete span for base, 1 merged insert span for tailored
+        assert_eq!(res.pages[0].base_highlights.len(), 1);
+        assert_eq!(res.pages[0].tailored_highlights.len(), 1);
+    }
 }

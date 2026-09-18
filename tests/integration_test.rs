@@ -207,25 +207,37 @@ fn test_integration_theme_and_granularity_variants() {
 #[test]
 fn test_integration_private_fixtures_if_present() {
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let base = manifest.join("tests/fixtures_private/base.pdf");
-    let target = manifest.join("tests/fixtures_private/tailored.pdf");
+    // Test both standard private fixture paths and optional `.local.pdf` variants
+    // provided locally for manual inspection without being tracked in git.
+    let candidates = [
+        (
+            manifest.join("tests/fixtures_private/base.pdf"),
+            manifest.join("tests/fixtures_private/tailored.pdf"),
+        ),
+        (
+            manifest.join("tests/fixtures_private/base.local.pdf"),
+            manifest.join("tests/fixtures_private/tailored.local.pdf"),
+        ),
+    ];
 
-    if base.exists() && target.exists() {
-        let out_dir = tempfile::tempdir().expect("tempdir");
-        let out = out_dir.path().join("private_diff.pdf");
+    for (base, target) in candidates {
+        if base.exists() && target.exists() {
+            let out_dir = tempfile::tempdir().expect("tempdir");
+            let out = out_dir.path().join("private_diff.pdf");
 
-        let mut cmd = Command::cargo_bin("pdf-vdiff").unwrap();
-        cmd.arg(&base)
-            .arg(&target)
-            .arg("-o")
-            .arg(&out)
-            .arg("-f")
-            .assert()
-            .failure()
-            .code(1)
-            .stdout(predicate::str::contains("Differences detected"));
+            let mut cmd = Command::cargo_bin("pdf-vdiff").unwrap();
+            cmd.arg(&base)
+                .arg(&target)
+                .arg("-o")
+                .arg(&out)
+                .arg("-f")
+                .assert()
+                .failure()
+                .code(1)
+                .stdout(predicate::str::contains("Differences detected"));
 
-        assert!(out.exists());
-        assert!(std::fs::metadata(&out).unwrap().len() > 10000);
+            assert!(out.exists());
+            assert!(std::fs::metadata(&out).unwrap().len() > 10000);
+        }
     }
 }

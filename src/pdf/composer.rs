@@ -322,14 +322,12 @@ impl<'a> CanvasCompositor<'a> {
                 DiffOpKind::Delete => (theme.deletion_fill, Some(theme.deletion_stroke)),
                 DiffOpKind::Insert => (theme.addition_fill, Some(theme.addition_stroke)),
                 DiffOpKind::Replace => {
-                    if span.is_modified_token {
-                        if is_tailored {
-                            (theme.addition_fill, Some(theme.addition_stroke))
-                        } else {
-                            (theme.deletion_fill, Some(theme.deletion_stroke))
-                        }
+                    // Under text-only diffing, replaced tokens render as additions on tailored
+                    // and deletions on base without full-line background tints
+                    if is_tailored {
+                        (theme.addition_fill, Some(theme.addition_stroke))
                     } else {
-                        (theme.replaced_line_tint, None)
+                        (theme.deletion_fill, Some(theme.deletion_stroke))
                     }
                 }
                 _ => continue,

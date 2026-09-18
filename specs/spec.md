@@ -258,13 +258,16 @@ pub enum PdfVdiffError {
 
 ---
 
-### 4.5 Hierarchical Diff Engine & Highlight Box Unioning
+### 4.5 Token-Stream Diff Engine & Highlight Box Unioning
 
 1. **Scope**: Diffing is performed per page-pair $(P_{base}[i], P_{tailored}[i])$ for $i \in 0 .. \max(N_{base}, N_{tailored})$. If $i \ge N_{base}$, the Base token slice is empty (`&[]`), marking all tokens on Tailored page $i$ as `Insert`.
-2. **Hierarchical 2-Pass Matching**:
-   - **Pass 1 (Line-Level)**: Compare normalized line strings using Myers sequence matching. Lines are tagged as `Equal`, `Delete`, `Insert`, or `Replace`.
-   - **Pass 2 (Token-Level)**: For `Replace` lines, run token-level Myers diff to isolate specific altered words.
-3. **Contiguous Highlight Merging**:
+2. **Token-Stream Sequence Matching (`word` / `character` mode)**:
+   - Tokens in natural visual reading order are compared directly across the page stream using Myers sequence diffing.
+   - Text that wraps or shifts across visual line boundaries due to insertions/deletions on preceding lines is recognized as identical (`DiffOp::Equal`) and produces zero highlight rectangles (reflow invariance).
+   - Only genuinely inserted tokens (on tailored page) and deleted tokens (on base page) receive highlight rectangles.
+3. **Line-Level Matching (`line` mode)**:
+   - For `--granularity line`, normalized line strings are diffed using Myers sequence matching, highlighting full line bounding boxes.
+4. **Contiguous Highlight Merging**:
    - Adjacent altered tokens on the same line are merged into a single contiguous bounding box:
      $$x_0 = \min(t.x_0) - \text{pad}_x,\quad y_0 = \min(t.y_0) - \text{pad}_y,\quad x_1 = \max(t.x_1) + \text{pad}_x,\quad y_1 = \max(t.y_1) + \text{pad}_y$$
    - Contiguous highlight bounding boxes are expanded using the padding constants defined in Section 4.6 (`HIGHLIGHT_PAD_X = 0.5 pt`, `HIGHLIGHT_PAD_Y = 1.0 pt`, `HIGHLIGHT_CORNER_RADIUS = 1.5 pt`).

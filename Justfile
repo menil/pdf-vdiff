@@ -13,13 +13,13 @@ lint:
     cargo fmt --check
     cargo clippy --all-targets -- -D warnings
 
-# Run all unit and integration tests
+# Run all unit and integration tests (single-threaded due to PDFium C library global state)
 test:
-    cargo test
+    cargo test -- --test-threads=1
 
-# Run code coverage with fail-under threshold
+# Run code coverage with fail-under threshold (single-threaded due to PDFium C library global state)
 coverage:
-    cargo llvm-cov --fail-under-lines 85
+    cargo llvm-cov --fail-under-lines 85 -- --test-threads=1
 
 # Build release binary
 build:

@@ -6,6 +6,7 @@ pub mod diff;
 pub mod error;
 pub mod layout;
 pub mod model;
+pub mod pdf;
 pub mod theme;
 
 pub use cluster::{cluster_and_sort_tokens, cluster_tokens_default, normalize_token_text};

@@ -1,69 +1,144 @@
-# Project Template
+# `pdf-vdiff`
 
-A generic, modern project template pre-configured with developer tooling, Nix integration, local git hook validation, and automated AI code reviews.
+A fast, standalone CLI tool for side-by-side visual PDF diffing, designed primarily to inspect and verify changes between a base resume/CV and an AI-tailored version while preserving 100% vector fidelity and text searchability.
+
+`pdf-vdiff` compares two PDF documents (such as your canonical base resume/CV and an AI-customized version for a job application) and generates a single side-by-side landscape PDF with IntelliJ/GitHub-style visual diff highlighting. It allows you to immediately spot reworded bullet points, added keywords, and omitted sections before submitting your application.
+
+---
 
 ## Features
 
-- 🤖 **Automated PR Reviews**: Integrated via `menil/pr-code-review-action` using OpenRouter (free tier by default).
-- ❄️ **Nix Shell**: Pre-configured `shell.nix` for consistent, reproducible developer environments.
-- 🛠️ **Local Task Runner (`Justfile`)**: Standardized commands for formatting, linting, and validating code.
-- 🛡️ **Git Hooks**: Pre-configured conventional commit title checks and automatic pre-commit quality checks.
-- ⚡ **Direnv Ready**: Automatically configures local git hooks and Beads issue tracking upon entering the directory.
-- ✅ **CI Validation**: A `validate` GitHub Actions workflow runs `just validate` on every push/PR, so checks aren't only enforced by the (bypassable) local pre-commit hook.
+- 📄 **100% Vector Fidelity**: Embeds native PDF page objects directly—no lossy rasterization or blurry text.
+- 🔍 **Full Text Searchability**: Diff output maintains searchable and selectable text layers.
+- 🧠 **Intelligent Hierarchical Diffing**: Extracts text tokens with exact bounding boxes via PDFium, clusters lines and columns spatially, and computes Myers sequence diffs at word, line, or character granularity.
+- 🎨 **Multiple Color Themes**: Choose between `intellij` (default), `github`, `classic`, and `high-contrast` palettes.
+- ⚡ **Zero-Friction CLI**: Automatically opens output in your system default PDF viewer (`--open`), supports custom gutter widths, optional header banners, and structured exit codes.
+- 🛡️ **Hardened Ingestion**: Pre-flight dimension and page count validation, with PDFium V8 script execution explicitly disabled for security.
 
 ---
 
-## Getting Started
+## Example
 
-### 1. Create a Repository from this Template
+An example comparison of a base resume against a tailored resume is provided in the [`example/`](example/) directory:
 
-Click the **"Use this template"** button on GitHub, or create it via the GitHub CLI:
+- [`example/resume_base.pdf`](example/resume_base.pdf) — Base document
+- [`example/resume_tailored.pdf`](example/resume_tailored.pdf) — Modified / tailored document
+- [`example/resume_diff.pdf`](example/resume_diff.pdf) — Generated side-by-side visual diff
+
+To generate the diff for this example:
+
 ```bash
-gh repo create my-new-project --template menil/project-template --private --clone
+pdf-vdiff example/resume_base.pdf example/resume_tailored.pdf -o example/resume_diff.pdf
 ```
 
-### 2. Configure GitHub Secrets
+To automatically open the diff in your system viewer after generation:
 
-For the automated PR code reviews to run successfully, navigate to your new repository's **Settings > Secrets and variables > Actions** and add:
-
-* **`OPENROUTER_API_KEY`**: Your OpenRouter API Key.
-
-*(Note: The template uses GitHub's Action Sharing to fetch `menil/pr-code-review-action` keylessly. Ensure you have configured the action repository under **Settings > Actions > General > Access** to be accessible from other repositories owned by your user account).*
+```bash
+pdf-vdiff example/resume_base.pdf example/resume_tailored.pdf -o example/resume_diff.pdf --open
+```
 
 ---
 
-## Development Environment
+## Installation & Setup
 
-### Nix Shell
-Activate the Nix developer shell to load project tools:
+### Prerequisites
+
+`pdf-vdiff` requires Rust (2021 edition) and the native `PDFium` dynamic library.
+
+#### Using Nix (Recommended)
+If you use Nix, enter the pre-configured developer shell containing all required dependencies:
+
 ```bash
 nix-shell
 ```
 
-### Task Runner (`Justfile`)
-The following tasks are available via `just`:
-- `just`: List all available tasks.
-- `just format`: Format code and configuration files (also regenerates `.claude/settings.json` from `.agentignore`).
-- `just lint`: Run code and markdown linters.
-- `just sync-agent-ignore`: Regenerate `.claude/settings.json`'s `Read` deny rules from `.agentignore`.
-- `just check-agent-ignore-sync`: Verify `.claude/settings.json` is in sync with `.agentignore` (no write).
-- `just validate`: Execute all formatting, linting, and verification checks.
+### Building from Source
 
-### Git Hook Checks
-The project automatically configures local Git hooks:
-- **`commit-msg`**: Validates that all commit titles adhere to the [Conventional Commits](https://www.conventionalcommits.org/) standard (e.g. `feat: add database support`).
-- **`pre-commit`**: Automatically runs `just validate` before allowing a commit. If any check fails, the commit is aborted.
+```bash
+# Clone the repository
+git clone https://github.com/menil/pdf-vdiff.git
+cd pdf-vdiff
 
-These hooks only run locally and can be skipped (`git commit --no-verify`) or simply never installed (e.g. a contributor who hasn't run `direnv allow`, or a commit made through GitHub's web UI). The `validate` GitHub Actions workflow (`.github/workflows/validate.yml`) runs the same `just validate` in CI on every push and pull request as a backstop that can't be bypassed the same way.
+# Build release binary
+cargo build --release
 
-### Beads Issue Tracking
-`.beads/` (Beads' local issue database) is gitignored, so each clone provisions its own: `.envrc` runs `bd init --skip-agents --init-if-missing` on every `cd` into the repo, and `bd` itself no-ops once it's already initialized. `--skip-agents` deliberately omits `bd init`'s own `AGENTS.md`/`CLAUDE.md`/`.codex/`/`.claude/` generation: those agent instructions are already deployed globally to Claude Code, OpenCode, Codex, Gemini, and Pi via this machine's dotfiles (home-manager config), so a per-repo copy would just be a stale duplicate that's also at odds with the standing "don't commit agent-config directories" rule.
+# Binary will be available at ./target/release/pdf-vdiff
+```
 
-### AI Agent Ignore Files
-`.agentignore` at the repo root is the canonical, gitignore-syntax list of paths AI coding agents shouldn't read (dependencies, build output, secrets, caches, etc.). Where an agent supports it, its ignore file is a symlink to `.agentignore` so the pattern list never drifts:
+---
 
-- **Google Antigravity**: `.antigravityignore` → `.agentignore`. Note there are [open reports](https://github.com/google-antigravity/antigravity-cli/issues/309) that the Antigravity CLI doesn't always fully respect this file in practice.
-- **OpenCode**: has no native ignore-file support yet. The closest option is the community [`opencode-ignore`](https://github.com/lgladysz/opencode-ignore) plugin, which you install via `opencode.json` and which reads a `.ignore` file. If you adopt it, symlink `.ignore` to `.agentignore` the same way.
-- **Claude Code**: has **no** `.claudeignore` (or any other external ignore-file) mechanism — a symlink here would be inert. It automatically respects `.gitignore`. For checked-in paths it can't reach that way (e.g. lock files, vendored code), Claude Code supports `Read` deny rules in `.claude/settings.json` — see the [large-codebases guide](https://code.claude.com/docs/en/large-codebases.md#block-reads-of-generated-and-vendored-code). This repo ships a generated `.claude/settings.json` (tracked in git, like Claude Code's own convention for shared project settings — only `.claude/settings.local.json` is gitignored) so it's enforced out of the box.
+## Usage
 
-To update the pattern list, edit `.agentignore` — the symlinked files pick up the change automatically, and `just format` (or `just sync-agent-ignore` directly) regenerates `.claude/settings.json`'s deny rules from it via `scripts/sync-agent-ignore.sh`, so the two never drift. `just validate` fails if `.claude/settings.json` is stale.
+```bash
+pdf-vdiff [OPTIONS] <BASE_PDF> <TAILORED_PDF>
+```
+
+### Options & Flags
+
+| Option / Flag | Description | Default |
+| :--- | :--- | :--- |
+| `<BASE_PDF>` | Path to the original / base PDF document | *(Required)* |
+| `<TAILORED_PDF>` | Path to the modified / tailored PDF document | *(Required)* |
+| `-o, --output <PATH>` | Target output PDF file path | `<base_stem>_vs_<tailored_stem>_diff.pdf` |
+| `-f, --force` | Overwrite destination output file if it already exists | `false` |
+| `--open` | Automatically open the generated diff in default PDF viewer | `false` |
+| `--theme <THEME>` | Color palette (`intellij`, `github`, `classic`, `high-contrast`) | `intellij` |
+| `--granularity <MODE>` | Diff granularity (`word`, `line`, `character`) | `word` |
+| `--gutter-width <PT>` | Spacing in points between left and right pages | `24.0` |
+| `--no-header` | Suppress the top header/metadata banner | `false` |
+| `--max-pages <NUM>` | Maximum page count threshold to prevent unbounded processing | `250` |
+| `-v, --verbose` | Enable verbose structural logging | `false` |
+| `-h, --help` | Print help information | |
+| `-V, --version` | Print version information | |
+
+### Examples
+
+```bash
+# Compare two documents and open immediately in system default PDF viewer
+pdf-vdiff original.pdf modified.pdf --open
+
+# Use GitHub color theme with line-level diff granularity
+pdf-vdiff original.pdf modified.pdf --theme github --granularity line
+
+# Custom output destination and overwrite if target exists
+pdf-vdiff base.pdf tailored.pdf -o ./output/diff.pdf --force
+
+# Remove the top metadata banner and adjust gutter width
+pdf-vdiff v1.pdf v2.pdf --no-header --gutter-width 32.0
+```
+
+### Exit Codes
+
+| Code | Status | Description |
+| :---: | :--- | :--- |
+| `0` | **Identical Documents** | No differences detected. Generates diff PDF without highlights and exits 0. |
+| `1` | **Differences Found** | Differences detected. Generates diff PDF with highlights and exits 1. |
+| `2` | **Execution Error** | Fatal error (missing file, invalid permissions without `--force`, parse error). |
+
+---
+
+## Development
+
+A [`Justfile`](Justfile) task runner is included for common development workflows:
+
+```bash
+# List available recipes
+just
+
+# Run test suite
+just test
+
+# Check formatting and linting
+just lint
+
+# Run all validations (tests, linter, format check, coverage)
+just validate
+```
+
+For comprehensive guidelines on Nix environment setup, Git hooks, Beads issue tracking, and AI ignore policies, see the [Development Guide](DEVELOPMENT.md).
+
+---
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).

@@ -8,6 +8,9 @@ db.lock
 # Rust
 /target
 Cargo.lock
+*.dylib
+*.so
+*.a
 
 # Private / Local Testing Fixtures (Never commit real PII documents)
 tests/fixtures_private/

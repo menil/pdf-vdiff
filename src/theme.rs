@@ -47,12 +47,17 @@ pub struct DiffTheme {
 pub enum ThemeKind {
     /// Soft IntelliJ-style red/green diff colors (Default).
     #[default]
+    // Primary identifier is "intellij"; "intelli-j" is provided as a kebab-case alias
+    #[value(name = "intellij", alias = "intelli-j")]
     IntelliJ,
     /// Clean GitHub-style split diff colors.
+    #[value(name = "github", alias = "git-hub")]
     GitHub,
     /// Traditional vibrant red/green diff colors.
+    #[value(name = "classic")]
     Classic,
     /// High-contrast palette for maximum visual accessibility.
+    #[value(name = "high-contrast")]
     HighContrast,
 }
 

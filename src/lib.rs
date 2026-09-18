@@ -1,5 +1,13 @@
 //! `pdf_vdiff` core library.
-//! Provides pure-Rust geometry, token clustering, and diffing engines.
+//! Provides pure-Rust geometry, token clustering, diffing, and formatting models.
+
+pub mod error;
+pub mod model;
+pub mod theme;
+
+pub use error::PdfVdiffError;
+pub use model::{DiffOpKind, HighlightSpan, PageText, Rect, TextToken};
+pub use theme::{DiffTheme, ThemeKind};
 
 /// Returns the library version.
 pub fn version() -> &'static str {

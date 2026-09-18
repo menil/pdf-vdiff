@@ -1,0 +1,37 @@
+[package]
+name = "pdf_vdiff"
+version = "0.1.0"
+edition = "2021"
+authors = ["Meni Livne"]
+description = "A fast, standalone CLI tool for side-by-side visual PDF diffing"
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+
+[lib]
+name = "pdf_vdiff"
+path = "src/lib.rs"
+
+[[bin]]
+name = "pdf-vdiff"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive", "cargo"] }
+pdfium-render = "0.9"
+similar = { version = "2", features = ["unicode"] }
+unicode-normalization = "0.1"
+thiserror = "1"
+anyhow = "1"
+open = "5"
+tempfile = "3"
+
+[dev-dependencies]
+assert_cmd = "2"
+predicates = "3"
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = true
+panic = "abort"

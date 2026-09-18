@@ -6,11 +6,24 @@ default:
 
 # Format code and configuration files
 format: sync-agent-ignore
-    @echo "No formatter configured yet. Customize this recipe in the Justfile!"
+    cargo fmt
 
 # Run code and markdown linting checks
 lint:
-    @echo "No linter configured yet. Customize this recipe in the Justfile!"
+    cargo fmt --check
+    cargo clippy --all-targets -- -D warnings
+
+# Run all unit and integration tests
+test:
+    cargo test
+
+# Run code coverage with fail-under threshold
+coverage:
+    cargo llvm-cov --fail-under-lines 85
+
+# Build release binary
+build:
+    cargo build --release
 
 # Regenerate .claude/settings.json's Read-deny rules from .agentignore
 sync-agent-ignore:
@@ -20,8 +33,10 @@ sync-agent-ignore:
 check-agent-ignore-sync:
     @scripts/sync-agent-ignore.sh --check
 
-# Run all local checks (tests, format checks, lints)
+# Run all local checks (tests, format checks, lints, coverage)
 validate:
     @echo "Running project validations..."
     just check-agent-ignore-sync
     just lint
+    just test
+    just coverage

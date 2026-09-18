@@ -5,6 +5,15 @@ db.lock
 *.tmp
 *.bak
 
+# Rust
+/target
+Cargo.lock
+
+# Private / Local Testing Fixtures (Never commit real PII documents)
+tests/fixtures_private/
+*.local.pdf
+private/
+
 # IDEs
 .vscode/
 .idea/
@@ -18,35 +27,6 @@ db.lock
 .direnv/
 result
 result-*
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-.pytest_cache/
-.ruff_cache/
-.mypy_cache/
-.venv/
-env/
-venv/
-ENV/
-
-# JavaScript / TypeScript
-node_modules/
-dist/
-build/
-out/
-coverage/
-*.tsbuildinfo
-.npm/
-.eslintcache
-.turbo/
-.next/
-.nuxt/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
 
 # Temp files
 pr.diff
@@ -65,4 +45,3 @@ pr.diff
 
 # Beads / Dolt files (added by bd init)
 *.gate.lock*
-

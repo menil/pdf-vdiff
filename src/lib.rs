@@ -4,6 +4,7 @@
 pub mod cluster;
 pub mod diff;
 pub mod error;
+pub mod layout;
 pub mod model;
 pub mod theme;
 
@@ -12,6 +13,7 @@ pub use diff::{
     diff_documents, diff_page_pair, DiffGranularity, DocumentDiffResult, PageDiffResult,
 };
 pub use error::PdfVdiffError;
+pub use layout::{CanvasLayout, PageDimensions};
 pub use model::{DiffOpKind, HighlightSpan, PageText, Rect, TextToken};
 pub use theme::{DiffTheme, ThemeKind};
 

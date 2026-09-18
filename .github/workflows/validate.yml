@@ -5,6 +5,10 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   validate:
     runs-on: ubuntu-latest
@@ -16,6 +20,15 @@ jobs:
         uses: cachix/install-nix-action@v31
         with:
           nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Magic Nix Cache
+        uses: DeterminateSystems/magic-nix-cache-action@v15
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2.9.2
+        with:
+          cache-targets: "true"
+          cache-directories: target/llvm-cov-target
 
       - name: Run validation
         run: nix-shell --run "just validate"

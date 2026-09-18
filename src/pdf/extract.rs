@@ -16,7 +16,8 @@ pub fn extract_document_tokens(
 
     let mut pages = Vec::with_capacity(page_count);
     for (page_idx, page) in document.pages().iter().enumerate() {
-        let page_text = extract_page_tokens(&page, page_idx)?;
+        let mut page_text = extract_page_tokens(&page, page_idx)?;
+        crate::cluster::cluster_tokens_default(&mut page_text.tokens);
         pages.push(page_text);
     }
     Ok(pages)
@@ -35,7 +36,7 @@ pub fn should_coalesce_tokens(prev: &TextToken, token: &TextToken) -> bool {
         && token.text.chars().count() == 1
 }
 
-/// Extract tokens from a single PDFium page.
+/// Extract tokens from a single PDFium page by grouping characters into word tokens with precise bounding boxes.
 pub fn extract_page_tokens(page: &PdfPage, page_index: usize) -> Result<PageText, PdfVdiffError> {
     let width = page.width().value;
     let height = page.height().value;
@@ -46,55 +47,107 @@ pub fn extract_page_tokens(page: &PdfPage, page_index: usize) -> Result<PageText
         ))
     })?;
 
-    let mut raw_tokens = Vec::new();
+    let mut tokens: Vec<TextToken> = Vec::new();
+    let mut current_word = String::new();
+    let mut current_bounds: Option<Rect> = None;
+    let mut last_y_baseline: Option<f32> = None;
 
-    // Iterate over segments (words / chunks)
-    for segment in text_page.segments().iter() {
-        let text = segment.text();
-        let trimmed = text.trim();
-        if trimmed.is_empty() {
+    for ch in text_page.chars().iter() {
+        let Some(c) = ch.unicode_char() else {
+            continue;
+        };
+
+        // Whitespace indicates a word boundary
+        if c.is_whitespace() {
+            if !current_word.is_empty() {
+                if let Some(bounds) = current_bounds.take() {
+                    let trimmed = current_word.trim();
+                    if !trimmed.is_empty() {
+                        tokens.push(TextToken {
+                            text: trimmed.to_string(),
+                            normalized_text: crate::cluster::normalize_token_text(trimmed),
+                            bounds,
+                            page_index,
+                            column_index: 0,
+                            line_index: 0,
+                            trailing_space: true,
+                        });
+                    }
+                }
+                current_word.clear();
+                last_y_baseline = None;
+            } else if let Some(last) = tokens.last_mut() {
+                last.trailing_space = true;
+            }
             continue;
         }
 
-        let bounds = segment.bounds();
-        let x0 = bounds.left().value;
-        let y0 = bounds.bottom().value;
-        let x1 = bounds.right().value;
-        let y1 = bounds.top().value;
+        // Get character bounding box
+        let Ok(char_rect) = ch.tight_bounds().or_else(|_| ch.loose_bounds()) else {
+            continue;
+        };
 
-        // Ensure valid Rect invariant x0 <= x1 and y0 <= y1
-        let min_x = x0.min(x1);
-        let max_x = x0.max(x1);
-        let min_y = y0.min(y1);
-        let max_y = y0.max(y1);
+        let x0 = char_rect.left().value;
+        let y0 = char_rect.bottom().value;
+        let x1 = char_rect.right().value;
+        let y1 = char_rect.top().value;
 
-        let rect = Rect::new(min_x, min_y, max_x, max_y);
-        let trailing_space = text.ends_with(char::is_whitespace);
+        // Skip degenerate empty glyphs
+        if (x1 - x0).abs() < 0.001 && (y1 - y0).abs() < 0.001 {
+            continue;
+        }
 
-        raw_tokens.push(TextToken {
-            text: trimmed.to_string(),
-            normalized_text: crate::cluster::normalize_token_text(trimmed),
-            bounds: rect,
-            page_index,
-            column_index: 0,
-            line_index: 0,
-            trailing_space,
+        let rect = Rect::new(x0, y0, x1, y1);
+
+        // Check if baseline changed significantly (indicating newline / jump without whitespace)
+        let baseline_jump = if let Some(prev_y) = last_y_baseline {
+            (prev_y - y0).abs() > 3.0
+        } else {
+            false
+        };
+
+        if baseline_jump && !current_word.is_empty() {
+            if let Some(bounds) = current_bounds.take() {
+                let trimmed = current_word.trim();
+                if !trimmed.is_empty() {
+                    tokens.push(TextToken {
+                        text: trimmed.to_string(),
+                        normalized_text: crate::cluster::normalize_token_text(trimmed),
+                        bounds,
+                        page_index,
+                        column_index: 0,
+                        line_index: 0,
+                        trailing_space: true,
+                    });
+                }
+            }
+            current_word.clear();
+        }
+
+        current_word.push(c);
+        last_y_baseline = Some(y0);
+        current_bounds = Some(match current_bounds {
+            Some(b) => b.union(&rect),
+            None => rect,
         });
     }
 
-    // Coalesce single-character segments into words if they are directly adjacent on the same baseline
-    let mut tokens: Vec<TextToken> = Vec::with_capacity(raw_tokens.len());
-    for token in raw_tokens {
-        if let Some(prev) = tokens.last_mut() {
-            if should_coalesce_tokens(prev, &token) {
-                prev.text.push_str(&token.text);
-                prev.normalized_text.push_str(&token.normalized_text);
-                prev.bounds = prev.bounds.union(&token.bounds);
-                prev.trailing_space = token.trailing_space;
-                continue;
+    // Flush any remaining word token
+    if !current_word.is_empty() {
+        if let Some(bounds) = current_bounds {
+            let trimmed = current_word.trim();
+            if !trimmed.is_empty() {
+                tokens.push(TextToken {
+                    text: trimmed.to_string(),
+                    normalized_text: crate::cluster::normalize_token_text(trimmed),
+                    bounds,
+                    page_index,
+                    column_index: 0,
+                    line_index: 0,
+                    trailing_space: false,
+                });
             }
         }
-        tokens.push(token);
     }
 
     Ok(PageText {

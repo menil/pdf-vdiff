@@ -137,28 +137,41 @@ pub fn diff_page_pair(
         };
     }
 
-    // Hierarchical diffing
+    // Token-stream diffing
     match granularity {
         DiffGranularity::Line => diff_by_lines_only(page_index, base_tokens, tailored_tokens),
         DiffGranularity::Word | DiffGranularity::Character => {
-            diff_hierarchical(page_index, base_tokens, tailored_tokens)
+            diff_token_stream(page_index, base_tokens, tailored_tokens)
         }
     }
 }
 
-/// Hierarchical two-pass diff: line-level matching followed by fine-grained token diff.
-fn diff_hierarchical(
+/// Direct token-stream diffing across natural reading order.
+///
+/// Compares normalized token texts directly using Myers diff.
+/// Tokens that shift across line wraps/reflows without changing their textual content
+/// are matched as equal and produce zero highlight rectangles.
+/// Only inserted tokens receive addition highlights (tailored) and deleted tokens
+/// receive deletion highlights (base).
+///
+/// Note: Replace operations emit direct token-level deletions on the Base document
+/// and insertions on the Tailored document without full-line background tint boxes,
+/// ensuring that only changed text is highlighted.
+fn diff_token_stream(
     page_index: usize,
     base_tokens: &[TextToken],
     tailored_tokens: &[TextToken],
 ) -> PageDiffResult {
-    let base_lines = group_tokens_by_line(base_tokens);
-    let tailored_lines = group_tokens_by_line(tailored_tokens);
+    let base_words: Vec<&str> = base_tokens
+        .iter()
+        .map(|t| t.normalized_text.as_str())
+        .collect();
+    let tailored_words: Vec<&str> = tailored_tokens
+        .iter()
+        .map(|t| t.normalized_text.as_str())
+        .collect();
 
-    let base_line_strs = extract_normalized_line_strings(&base_lines);
-    let tailored_line_strs = extract_normalized_line_strings(&tailored_lines);
-
-    let diff_ops = capture_diff_slices(Algorithm::Myers, &base_line_strs, &tailored_line_strs);
+    let diff_ops = capture_diff_slices(Algorithm::Myers, &base_words, &tailored_words);
 
     let mut base_highlights = Vec::new();
     let mut tailored_highlights = Vec::new();
@@ -167,31 +180,29 @@ fn diff_hierarchical(
     for op in diff_ops {
         match op {
             similar::DiffOp::Equal { .. } => {
-                // Unchanged lines: 0 highlights
+                // Unchanged tokens: 0 highlights
             }
             similar::DiffOp::Delete {
                 old_index, old_len, ..
             } => {
                 has_differences = true;
-                for line in &base_lines[old_index..old_index + old_len] {
-                    base_highlights.extend(merge_contiguous_highlights(
-                        line.tokens,
-                        DiffOpKind::Delete,
-                        false,
-                    ));
-                }
+                let slice = &base_tokens[old_index..old_index + old_len];
+                base_highlights.extend(merge_contiguous_highlights(
+                    slice,
+                    DiffOpKind::Delete,
+                    false,
+                ));
             }
             similar::DiffOp::Insert {
                 new_index, new_len, ..
             } => {
                 has_differences = true;
-                for line in &tailored_lines[new_index..new_index + new_len] {
-                    tailored_highlights.extend(merge_contiguous_highlights(
-                        line.tokens,
-                        DiffOpKind::Insert,
-                        false,
-                    ));
-                }
+                let slice = &tailored_tokens[new_index..new_index + new_len];
+                tailored_highlights.extend(merge_contiguous_highlights(
+                    slice,
+                    DiffOpKind::Insert,
+                    false,
+                ));
             }
             similar::DiffOp::Replace {
                 old_index,
@@ -200,16 +211,19 @@ fn diff_hierarchical(
                 new_len,
             } => {
                 has_differences = true;
-                let old_slice = &base_lines[old_index..old_index + old_len];
-                let new_slice = &tailored_lines[new_index..new_index + new_len];
-
-                // Pass 2: Token-level fine-grained diff across modified line blocks
-                diff_modified_line_blocks(
+                // Treat Replace as token deletion on Base and token addition on Tailored (text-only diffing)
+                let old_slice = &base_tokens[old_index..old_index + old_len];
+                let new_slice = &tailored_tokens[new_index..new_index + new_len];
+                base_highlights.extend(merge_contiguous_highlights(
                     old_slice,
+                    DiffOpKind::Delete,
+                    false,
+                ));
+                tailored_highlights.extend(merge_contiguous_highlights(
                     new_slice,
-                    &mut base_highlights,
-                    &mut tailored_highlights,
-                );
+                    DiffOpKind::Insert,
+                    false,
+                ));
             }
         }
     }
@@ -219,87 +233,6 @@ fn diff_hierarchical(
         base_highlights,
         tailored_highlights,
         has_differences,
-    }
-}
-
-/// Computes token-level differences within modified line blocks and adds line tint + word highlights.
-fn diff_modified_line_blocks(
-    old_lines: &[LineGroup],
-    new_lines: &[LineGroup],
-    base_highlights: &mut Vec<HighlightSpan>,
-    tailored_highlights: &mut Vec<HighlightSpan>,
-) {
-    // 1. Add subtle background tint across the modified lines
-    for line in old_lines {
-        if let Some(bounds) = compute_line_bounds(line.tokens) {
-            base_highlights.push(HighlightSpan::new(bounds, DiffOpKind::Replace, false));
-        }
-    }
-    for line in new_lines {
-        if let Some(bounds) = compute_line_bounds(line.tokens) {
-            tailored_highlights.push(HighlightSpan::new(bounds, DiffOpKind::Replace, false));
-        }
-    }
-
-    // 2. Fine-grained word token diff
-    let old_tokens: Vec<&TextToken> = old_lines.iter().flat_map(|l| l.tokens.iter()).collect();
-    let new_tokens: Vec<&TextToken> = new_lines.iter().flat_map(|l| l.tokens.iter()).collect();
-
-    let old_words: Vec<&str> = old_tokens
-        .iter()
-        .map(|t| t.normalized_text.as_str())
-        .collect();
-    let new_words: Vec<&str> = new_tokens
-        .iter()
-        .map(|t| t.normalized_text.as_str())
-        .collect();
-
-    let token_diffs = capture_diff_slices(Algorithm::Myers, &old_words, &new_words);
-
-    for token_op in token_diffs {
-        match token_op {
-            similar::DiffOp::Equal { .. } => {}
-            similar::DiffOp::Delete {
-                old_index, old_len, ..
-            } => {
-                let deleted_slice = &old_tokens[old_index..old_index + old_len];
-                base_highlights.extend(merge_token_ref_highlights(
-                    deleted_slice,
-                    DiffOpKind::Delete,
-                    true,
-                ));
-            }
-            similar::DiffOp::Insert {
-                new_index, new_len, ..
-            } => {
-                let inserted_slice = &new_tokens[new_index..new_index + new_len];
-                tailored_highlights.extend(merge_token_ref_highlights(
-                    inserted_slice,
-                    DiffOpKind::Insert,
-                    true,
-                ));
-            }
-            similar::DiffOp::Replace {
-                old_index,
-                old_len,
-                new_index,
-                new_len,
-            } => {
-                let deleted_slice = &old_tokens[old_index..old_index + old_len];
-                let inserted_slice = &new_tokens[new_index..new_index + new_len];
-
-                base_highlights.extend(merge_token_ref_highlights(
-                    deleted_slice,
-                    DiffOpKind::Delete,
-                    true,
-                ));
-                tailored_highlights.extend(merge_token_ref_highlights(
-                    inserted_slice,
-                    DiffOpKind::Insert,
-                    true,
-                ));
-            }
-        }
     }
 }
 
@@ -483,15 +416,6 @@ fn merge_token_highlights<T: std::borrow::Borrow<TextToken>>(
 /// Convenience alias for merging owned token slices.
 fn merge_contiguous_highlights(
     tokens: &[TextToken],
-    op: DiffOpKind,
-    is_modified_token: bool,
-) -> Vec<HighlightSpan> {
-    merge_token_highlights(tokens, op, is_modified_token)
-}
-
-/// Convenience alias for merging borrowed token slices.
-fn merge_token_ref_highlights(
-    tokens: &[&TextToken],
     op: DiffOpKind,
     is_modified_token: bool,
 ) -> Vec<HighlightSpan> {

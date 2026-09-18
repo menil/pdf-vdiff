@@ -2,11 +2,15 @@
 //! Provides pure-Rust geometry, token clustering, diffing, and formatting models.
 
 pub mod cluster;
+pub mod diff;
 pub mod error;
 pub mod model;
 pub mod theme;
 
 pub use cluster::{cluster_and_sort_tokens, cluster_tokens_default, normalize_token_text};
+pub use diff::{
+    diff_documents, diff_page_pair, DiffGranularity, DocumentDiffResult, PageDiffResult,
+};
 pub use error::PdfVdiffError;
 pub use model::{DiffOpKind, HighlightSpan, PageText, Rect, TextToken};
 pub use theme::{DiffTheme, ThemeKind};

@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["Meni Livne"]
 description = "A fast, standalone CLI tool for side-by-side visual PDF diffing"
 readme = "README.md"
-license = "MIT OR Apache-2.0"
+license = "MIT"
 
 [lib]
 name = "pdf_vdiff"

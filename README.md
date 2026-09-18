@@ -5,6 +5,9 @@ A fast, standalone CLI tool for side-by-side visual PDF diffing, designed primar
 `pdf-vdiff` compares two PDF documents (such as your canonical base resume/CV and an AI-customized version for a job application) and generates a single side-by-side landscape PDF with IntelliJ/GitHub-style visual diff highlighting. It allows you to immediately spot reworded bullet points, added keywords, and omitted sections before submitting your application.
 
 ---
+<img width="1439" height="959" alt="Screenshot 2026-09-18 at 16 51 54" src="https://github.com/user-attachments/assets/0c0c2b74-d0ea-451a-a942-d1fa0b930bc3" />
+
+---
 
 ## Features
 

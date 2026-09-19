@@ -1,11 +1,15 @@
 [package]
-name = "pdf_vdiff"
+name = "pdf-vdiff"
 version = "0.1.0"
 edition = "2021"
-authors = ["Meni Livne"]
+authors = ["Meni Livne <meni@livne.org>"]
 description = "A fast, standalone CLI tool for side-by-side visual PDF diffing"
 readme = "README.md"
 license = "MIT"
+repository = "https://github.com/menil/pdf-vdiff"
+homepage = "https://github.com/menil/pdf-vdiff"
+keywords = ["pdf", "diff", "visual-diff", "resume", "vector"]
+categories = ["command-line-utilities", "text-processing"]
 
 [lib]
 name = "pdf_vdiff"

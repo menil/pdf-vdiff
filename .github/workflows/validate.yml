@@ -30,5 +30,11 @@ jobs:
           cache-targets: "true"
           cache-directories: target/llvm-cov-target
 
+      - name: Check Nix Flake
+        run: nix flake check
+
+      - name: Build Nix Package
+        run: nix build
+
       - name: Run validation
         run: nix-shell --run "just validate"

@@ -44,15 +44,50 @@ pdf-vdiff example/resume_base.pdf example/resume_tailored.pdf -o example/resume_
 
 ## Installation & Setup
 
-### Prerequisites
+### Using Nix Flakes (Recommended)
 
-`pdf-vdiff` requires Rust (2021 edition) and the native `PDFium` dynamic library.
-
-#### Using Nix (Recommended)
-If you use Nix, enter the pre-configured developer shell containing all required dependencies:
+`pdf-vdiff` provides full Nix Flake support (requires Nix 2.4+ with `flakes` and `nix-command` enabled). You can run it instantly without manual installation or dependencies:
 
 ```bash
-nix-shell
+# Run directly from GitHub
+nix run github:menil/pdf-vdiff -- base.pdf tailored.pdf --open
+
+# Install to your global Nix profile ($PATH)
+nix profile install github:menil/pdf-vdiff
+```
+
+#### In Another Repository's `flake.nix`
+
+Add `pdf-vdiff` as an input to include it in your developer shells or packages:
+
+```nix
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    pdf-vdiff.url = "github:menil/pdf-vdiff";
+    pdf-vdiff.inputs.nixpkgs.follows = "nixpkgs";
+  };
+
+  outputs = { self, nixpkgs, pdf-vdiff, ... }:
+    let
+      system = "aarch64-darwin"; # or "x86_64-linux", etc.
+      pkgs = nixpkgs.legacyPackages.${system};
+    in {
+      devShells.${system}.default = pkgs.mkShell {
+        packages = [
+          pdf-vdiff.packages.${system}.default
+        ];
+      };
+    };
+}
+```
+
+### Traditional Nix Shell
+
+If you are developing inside this repository, enter the pre-configured developer shell:
+
+```bash
+nix-shell # or nix develop
 ```
 
 ### Building from Source

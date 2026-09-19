@@ -6,11 +6,15 @@ This document outlines developer tooling, workflow conventions, and validation p
 
 ## 1. Developer Environment
 
-### Nix Shell (Recommended)
+### Nix Environment (Recommended)
 
-The project includes a `shell.nix` configuration providing Rust, `PDFium` dynamic libraries, `just`, and development tools:
+The project includes full Nix Flake (Nix 2.4+) and `shell.nix` configurations providing Rust, `PDFium` dynamic libraries, `just`, and development tools:
 
 ```bash
+# Load development shell via Flake (recommended)
+nix develop
+
+# Or traditional Nix shell
 nix-shell
 ```
 

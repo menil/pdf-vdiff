@@ -23,6 +23,11 @@ pub const DEFAULT_COLUMN_GUTTER_THRESHOLD: f32 = 12.0;
 /// Default vertical baseline grouping tolerance in PDF points.
 pub const DEFAULT_BASELINE_TOLERANCE: f32 = 2.0;
 
+/// Minimum glyph height threshold in PDF points for updating running baseline center averages.
+/// Tokens shorter than this threshold (e.g. periods, commas, apostrophes) are clustered using baseline
+/// proximity and vertical overlap to avoid pulling down the line center.
+pub const MIN_BASELINE_GLYPH_HEIGHT: f32 = 4.0;
+
 /// Full RGBA color palette definition for rendering visual diffs.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct DiffTheme {

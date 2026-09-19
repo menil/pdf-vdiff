@@ -36,7 +36,42 @@ pub fn should_coalesce_tokens(prev: &TextToken, token: &TextToken) -> bool {
         && token.text.chars().count() == 1
 }
 
-/// Extract tokens from a single PDFium page by grouping characters into word tokens with precise bounding boxes.
+/// Returns true if a character is a punctuation or typographical symbol that should be tokenized separately from words.
+///
+/// Checks three categories:
+/// 1. ASCII standard punctuation (`!`, `"`, `#`, `$`, `%`, `&`, `'`, `(`, `)`, `,`, `-`, `.`, `/`, `:`, `;`, etc.)
+/// 2. Unicode General Punctuation block (`\u{2000}`..=`\u{206F}`) including typographical quotes, dashes, and spaces
+/// 3. Common symbols and typographical marks (guillemets `«` `»`, bullets `•`, currency/math symbols, etc.)
+#[inline]
+pub fn is_punctuation(c: char) -> bool {
+    c.is_ascii_punctuation()
+        || ('\u{2000}'..='\u{206F}').contains(&c)
+        || matches!(
+            c,
+            '«' | '»'
+                | '‹'
+                | '›'
+                | '¡'
+                | '¿'
+                | '•'
+                | '·'
+                | '°'
+                | '©'
+                | '®'
+                | '™'
+                | '§'
+                | '¶'
+                | '±'
+                | '×'
+                | '÷'
+                | '≠'
+                | '≤'
+                | '≥'
+                | '−'
+        )
+}
+
+/// Extract tokens from a single PDFium page by grouping characters into word and punctuation tokens with precise bounding boxes.
 pub fn extract_page_tokens(page: &PdfPage, page_index: usize) -> Result<PageText, PdfVdiffError> {
     let width = page.width().value;
     let height = page.height().value;
@@ -52,6 +87,29 @@ pub fn extract_page_tokens(page: &PdfPage, page_index: usize) -> Result<PageText
     let mut current_bounds: Option<Rect> = None;
     let mut last_y_baseline: Option<f32> = None;
 
+    let flush_word = |tokens: &mut Vec<TextToken>,
+                      word: &mut String,
+                      bounds: &mut Option<Rect>,
+                      trailing_space: bool| {
+        if !word.is_empty() {
+            if let Some(b) = bounds.take() {
+                let trimmed = word.trim();
+                if !trimmed.is_empty() {
+                    tokens.push(TextToken {
+                        text: trimmed.to_string(),
+                        normalized_text: crate::cluster::normalize_token_text(trimmed),
+                        bounds: b,
+                        page_index,
+                        column_index: 0,
+                        line_index: 0,
+                        trailing_space,
+                    });
+                }
+            }
+            word.clear();
+        }
+    };
+
     for ch in text_page.chars().iter() {
         let Some(c) = ch.unicode_char() else {
             continue;
@@ -59,26 +117,11 @@ pub fn extract_page_tokens(page: &PdfPage, page_index: usize) -> Result<PageText
 
         // Whitespace indicates a word boundary
         if c.is_whitespace() {
-            if !current_word.is_empty() {
-                if let Some(bounds) = current_bounds.take() {
-                    let trimmed = current_word.trim();
-                    if !trimmed.is_empty() {
-                        tokens.push(TextToken {
-                            text: trimmed.to_string(),
-                            normalized_text: crate::cluster::normalize_token_text(trimmed),
-                            bounds,
-                            page_index,
-                            column_index: 0,
-                            line_index: 0,
-                            trailing_space: true,
-                        });
-                    }
-                }
-                current_word.clear();
-                last_y_baseline = None;
-            } else if let Some(last) = tokens.last_mut() {
+            flush_word(&mut tokens, &mut current_word, &mut current_bounds, true);
+            if let Some(last) = tokens.last_mut() {
                 last.trailing_space = true;
             }
+            last_y_baseline = None;
             continue;
         }
 
@@ -106,49 +149,38 @@ pub fn extract_page_tokens(page: &PdfPage, page_index: usize) -> Result<PageText
             false
         };
 
-        if baseline_jump && !current_word.is_empty() {
-            if let Some(bounds) = current_bounds.take() {
-                let trimmed = current_word.trim();
-                if !trimmed.is_empty() {
-                    tokens.push(TextToken {
-                        text: trimmed.to_string(),
-                        normalized_text: crate::cluster::normalize_token_text(trimmed),
-                        bounds,
-                        page_index,
-                        column_index: 0,
-                        line_index: 0,
-                        trailing_space: true,
-                    });
-                }
-            }
-            current_word.clear();
+        if baseline_jump {
+            flush_word(&mut tokens, &mut current_word, &mut current_bounds, true);
         }
 
-        current_word.push(c);
-        last_y_baseline = Some(y0);
-        current_bounds = Some(match current_bounds {
-            Some(b) => b.union(&rect),
-            None => rect,
-        });
+        if is_punctuation(c) {
+            // Flush any preceding word
+            flush_word(&mut tokens, &mut current_word, &mut current_bounds, false);
+
+            let s = c.to_string();
+            let norm = crate::cluster::normalize_token_text(&s);
+            tokens.push(TextToken {
+                text: s,
+                normalized_text: norm,
+                bounds: rect,
+                page_index,
+                column_index: 0,
+                line_index: 0,
+                trailing_space: false,
+            });
+            last_y_baseline = Some(y0);
+        } else {
+            current_word.push(c);
+            last_y_baseline = Some(y0);
+            current_bounds = Some(match current_bounds {
+                Some(b) => b.union(&rect),
+                None => rect,
+            });
+        }
     }
 
     // Flush any remaining word token
-    if !current_word.is_empty() {
-        if let Some(bounds) = current_bounds {
-            let trimmed = current_word.trim();
-            if !trimmed.is_empty() {
-                tokens.push(TextToken {
-                    text: trimmed.to_string(),
-                    normalized_text: crate::cluster::normalize_token_text(trimmed),
-                    bounds,
-                    page_index,
-                    column_index: 0,
-                    line_index: 0,
-                    trailing_space: false,
-                });
-            }
-        }
-    }
+    flush_word(&mut tokens, &mut current_word, &mut current_bounds, false);
 
     Ok(PageText {
         page_index,
@@ -256,6 +288,68 @@ mod tests {
         let mut t2_diff_line = t2.clone();
         t2_diff_line.bounds = Rect::new(18.5, 120.0, 26.0, 130.0);
         assert!(!should_coalesce_tokens(&t1, &t2_diff_line));
+    }
+
+    #[test]
+    fn test_is_punctuation() {
+        assert!(is_punctuation(','));
+        assert!(is_punctuation('.'));
+        assert!(is_punctuation(';'));
+        assert!(is_punctuation(':'));
+        assert!(is_punctuation('!'));
+        assert!(is_punctuation('?'));
+        assert!(is_punctuation('-'));
+        assert!(is_punctuation('('));
+        assert!(is_punctuation(')'));
+        assert!(is_punctuation('"'));
+        assert!(is_punctuation('\''));
+        assert!(is_punctuation('“'));
+        assert!(is_punctuation('”'));
+        assert!(is_punctuation('—'));
+        assert!(is_punctuation('•'));
+
+        assert!(!is_punctuation('a'));
+        assert!(!is_punctuation('Z'));
+        assert!(!is_punctuation('0'));
+        assert!(!is_punctuation('9'));
+        assert!(!is_punctuation(' '));
+    }
+
+    #[test]
+    fn test_extract_synthetic_document_with_punctuation() {
+        let pdfium = init_pdfium().expect("PDFium init failed");
+        let mut doc = pdfium.create_new_pdf().expect("create pdf");
+        let font_token = doc.fonts_mut().helvetica();
+
+        let mut page = doc
+            .pages_mut()
+            .create_page_at_end(PdfPagePaperSize::Custom(
+                PdfPoints::new(612.0),
+                PdfPoints::new(792.0),
+            ))
+            .expect("create page");
+
+        let font = doc.fonts().get(font_token).expect("font");
+        let mut text_obj = page
+            .objects_mut()
+            .create_text_object(
+                PdfPoints::new(72.0),
+                PdfPoints::new(700.0),
+                "Software tests, and builds.",
+                font,
+                PdfPoints::new(14.0),
+            )
+            .expect("create text");
+        let _ = text_obj.set_fill_color(PdfColor::BLACK);
+
+        let extracted = extract_document_tokens(&doc, 250).expect("extract");
+        assert_eq!(extracted.len(), 1);
+        let tokens = &extracted[0].tokens;
+        let token_texts: Vec<&str> = tokens.iter().map(|t| t.text.as_str()).collect();
+        assert_eq!(
+            token_texts,
+            vec!["Software", "tests", ",", "and", "builds", "."]
+        );
     }
 
     #[test]

@@ -685,4 +685,117 @@ mod tests {
         assert_eq!(res.pages[0].base_highlights.len(), 1);
         assert_eq!(res.pages[0].tailored_highlights.len(), 1);
     }
+
+    #[test]
+    fn test_punctuation_insertion_only_highlights_punctuation() {
+        // Base: "tests"
+        let b0 = make_token("tests", 50.0, 750.0, 85.0, 762.0, 0);
+
+        // Tailored: "tests,"
+        let t0 = make_token("tests", 50.0, 750.0, 85.0, 762.0, 0);
+        let t1 = make_token(",", 85.5, 750.0, 89.0, 762.0, 0);
+
+        let base_page = PageText::new(vec![b0], 612.0, 792.0, 0);
+        let tailored_page = PageText::new(vec![t0, t1], 612.0, 792.0, 0);
+
+        let res = diff_documents(&[base_page], &[tailored_page], DiffGranularity::Word);
+        assert!(res.has_differences);
+        // Base should have 0 highlights since "tests" is unchanged
+        assert!(res.pages[0].base_highlights.is_empty());
+        // Tailored should have exactly 1 highlight covering only the comma
+        assert_eq!(res.pages[0].tailored_highlights.len(), 1);
+        assert_eq!(res.pages[0].tailored_highlights[0].op, DiffOpKind::Insert);
+        // Verify bounding box matches comma bounds expanded with padding
+        assert!((res.pages[0].tailored_highlights[0].bounds.x0 - 85.0).abs() < 0.1);
+        assert!((res.pages[0].tailored_highlights[0].bounds.x1 - 89.5).abs() < 0.1);
+    }
+
+    #[test]
+    fn test_punctuation_deletion_only_highlights_punctuation() {
+        // Base: "tests,"
+        let b0 = make_token("tests", 50.0, 750.0, 85.0, 762.0, 0);
+        let b1 = make_token(",", 85.5, 750.0, 89.0, 762.0, 0);
+
+        // Tailored: "tests"
+        let t0 = make_token("tests", 50.0, 750.0, 85.0, 762.0, 0);
+
+        let base_page = PageText::new(vec![b0, b1], 612.0, 792.0, 0);
+        let tailored_page = PageText::new(vec![t0], 612.0, 792.0, 0);
+
+        let res = diff_documents(&[base_page], &[tailored_page], DiffGranularity::Word);
+        assert!(res.has_differences);
+        // Base should have exactly 1 highlight covering only the deleted comma
+        assert_eq!(res.pages[0].base_highlights.len(), 1);
+        assert_eq!(res.pages[0].base_highlights[0].op, DiffOpKind::Delete);
+        // Tailored should have 0 highlights
+        assert!(res.pages[0].tailored_highlights.is_empty());
+    }
+
+    #[test]
+    fn test_punctuation_replacement_preserves_word() {
+        // Base: "tests."
+        let b0 = make_token("tests", 50.0, 750.0, 85.0, 762.0, 0);
+        let b1 = make_token(".", 85.5, 750.0, 88.0, 762.0, 0);
+
+        // Tailored: "tests,"
+        let t0 = make_token("tests", 50.0, 750.0, 85.0, 762.0, 0);
+        let t1 = make_token(",", 85.5, 750.0, 89.0, 762.0, 0);
+
+        let base_page = PageText::new(vec![b0, b1], 612.0, 792.0, 0);
+        let tailored_page = PageText::new(vec![t0, t1], 612.0, 792.0, 0);
+
+        let res = diff_documents(&[base_page], &[tailored_page], DiffGranularity::Word);
+        assert!(res.has_differences);
+        // Base highlights only "."
+        assert_eq!(res.pages[0].base_highlights.len(), 1);
+        assert_eq!(res.pages[0].base_highlights[0].op, DiffOpKind::Delete);
+        // Tailored highlights only ","
+        assert_eq!(res.pages[0].tailored_highlights.len(), 1);
+        assert_eq!(res.pages[0].tailored_highlights[0].op, DiffOpKind::Insert);
+    }
+
+    #[test]
+    fn test_hyphenated_and_bracketed_punctuation_edits() {
+        // Base: "(hello)"
+        let b0 = make_token("(", 45.0, 750.0, 49.0, 762.0, 0);
+        let b1 = make_token("hello", 50.0, 750.0, 85.0, 762.0, 0);
+        let b2 = make_token(")", 86.0, 750.0, 90.0, 762.0, 0);
+
+        // Tailored: "hello"
+        let t0 = make_token("hello", 50.0, 750.0, 85.0, 762.0, 0);
+
+        let base_page = PageText::new(vec![b0, b1, b2], 612.0, 792.0, 0);
+        let tailored_page = PageText::new(vec![t0], 612.0, 792.0, 0);
+
+        let res = diff_documents(&[base_page], &[tailored_page], DiffGranularity::Word);
+        assert!(res.has_differences);
+        // Base highlights "(" and ")" as 2 separate deletion spans around untouched "hello"
+        assert_eq!(res.pages[0].base_highlights.len(), 2);
+        assert!(res.pages[0].tailored_highlights.is_empty());
+    }
+
+    #[test]
+    fn test_phrase_replacement_with_punctuation_preservation() {
+        // Base: "Built scalable APIs."
+        let b0 = make_token("Built", 50.0, 750.0, 85.0, 762.0, 0);
+        let b1 = make_token("scalable", 90.0, 750.0, 140.0, 762.0, 0);
+        let b2 = make_token("APIs", 145.0, 750.0, 180.0, 762.0, 0);
+        let b3 = make_token(".", 181.0, 750.0, 184.0, 762.0, 0);
+
+        // Tailored: "Designed distributed systems."
+        let t0 = make_token("Designed", 50.0, 750.0, 105.0, 762.0, 0);
+        let t1 = make_token("distributed", 110.0, 750.0, 175.0, 762.0, 0);
+        let t2 = make_token("systems", 180.0, 750.0, 225.0, 762.0, 0);
+        let t3 = make_token(".", 226.0, 750.0, 229.0, 762.0, 0);
+
+        let base_page = PageText::new(vec![b0, b1, b2, b3], 612.0, 792.0, 0);
+        let tailored_page = PageText::new(vec![t0, t1, t2, t3], 612.0, 792.0, 0);
+
+        let res = diff_documents(&[base_page], &[tailored_page], DiffGranularity::Word);
+        assert!(res.has_differences);
+        // Base has 1 merged highlight span covering "Built scalable APIs" (excluding ".")
+        assert_eq!(res.pages[0].base_highlights.len(), 1);
+        // Tailored has 1 merged highlight span covering "Designed distributed systems" (excluding ".")
+        assert_eq!(res.pages[0].tailored_highlights.len(), 1);
+    }
 }

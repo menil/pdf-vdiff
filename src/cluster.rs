@@ -1,7 +1,9 @@
 //! Unicode normalization, spatial column clustering, and reading-order reconstruction.
 
 use crate::model::TextToken;
-use crate::theme::{DEFAULT_BASELINE_TOLERANCE, DEFAULT_COLUMN_GUTTER_THRESHOLD};
+use crate::theme::{
+    DEFAULT_BASELINE_TOLERANCE, DEFAULT_COLUMN_GUTTER_THRESHOLD, MIN_BASELINE_GLYPH_HEIGHT,
+};
 use unicode_normalization::UnicodeNormalization;
 
 /// Normalizes text using Unicode NFKD and decomposes standard typographical ligatures and quotes.
@@ -26,7 +28,21 @@ pub fn normalize_token_text(input: &str) -> String {
 #[derive(Debug, Clone)]
 struct LineCluster {
     y_center: f32,
+    y0: f32,
+    y1: f32,
     tokens: Vec<usize>, // Token indices
+}
+
+#[inline]
+fn token_matches_line(line: &LineCluster, t: &TextToken, baseline_tolerance: f32) -> bool {
+    let y_center = (t.bounds.y0 + t.bounds.y1) / 2.0;
+    if (line.y_center - y_center).abs() <= baseline_tolerance {
+        return true;
+    }
+    // Check baseline proximity and vertical overlap for punctuation / sub-height glyphs
+    let same_baseline = (line.y0 - t.bounds.y0).abs() <= baseline_tolerance * 1.5;
+    let overlaps = t.bounds.y0 <= line.y1 && t.bounds.y1 >= line.y0;
+    same_baseline || overlaps
 }
 
 /// Clusters and sorts text tokens on a page into natural visual reading order.
@@ -162,14 +178,14 @@ fn cluster_column_lines(
 
         // Check the most recently modified line first (fast path for reading-order runs)
         let matching_line = if let Some(last) = lines.last_mut() {
-            if (last.y_center - y_center).abs() <= baseline_tolerance {
+            if token_matches_line(last, t, baseline_tolerance) {
                 Some(last)
             } else {
                 lines
                     .iter_mut()
                     .rev()
                     .skip(1)
-                    .find(|line| (line.y_center - y_center).abs() <= baseline_tolerance)
+                    .find(|line| token_matches_line(line, t, baseline_tolerance))
             }
         } else {
             None
@@ -177,12 +193,17 @@ fn cluster_column_lines(
 
         if let Some(line) = matching_line {
             line.tokens.push(token_idx);
-            // Update running average of line center
-            let count = line.tokens.len() as f32;
-            line.y_center = ((line.y_center * (count - 1.0)) + y_center) / count;
+            line.y0 = line.y0.min(t.bounds.y0);
+            line.y1 = line.y1.max(t.bounds.y1);
+            if t.bounds.height() > MIN_BASELINE_GLYPH_HEIGHT {
+                let count = line.tokens.len() as f32;
+                line.y_center = ((line.y_center * (count - 1.0)) + y_center) / count;
+            }
         } else {
             lines.push(LineCluster {
                 y_center,
+                y0: t.bounds.y0,
+                y1: t.bounds.y1,
                 tokens: vec![token_idx],
             });
         }

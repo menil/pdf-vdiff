@@ -1,5 +1,10 @@
 # `pdf-vdiff`
 
+[![Crates.io](https://img.shields.io/crates/v/pdf-vdiff.svg)](https://crates.io/crates/pdf-vdiff)
+[![docs.rs](https://docs.rs/pdf-vdiff/badge.svg)](https://docs.rs/pdf-vdiff)
+[![CI](https://github.com/menil/pdf-vdiff/actions/workflows/validate.yml/badge.svg)](https://github.com/menil/pdf-vdiff/actions/workflows/validate.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 A fast, standalone CLI tool for side-by-side visual PDF diffing, designed primarily to inspect and verify changes between a base resume/CV and an AI-tailored version while preserving 100% vector fidelity and text searchability. It is used by [JobGitOps](https://github.com/menil/JobGitOps) to inspect resume diffs before submission.
 
 `pdf-vdiff` compares two PDF documents (such as your canonical base resume/CV and an AI-customized version for a job application) and generates a single side-by-side landscape PDF with IntelliJ/GitHub-style visual diff highlighting. It allows you to immediately spot reworded bullet points, added keywords, and omitted sections before submitting your application.
@@ -44,7 +49,43 @@ pdf-vdiff example/resume_base.pdf example/resume_tailored.pdf -o example/resume_
 
 ## Installation & Setup
 
-### Using Nix Flakes (Recommended)
+### CLI via Cargo (Crates.io)
+
+```bash
+cargo install pdf-vdiff
+```
+
+### As a Rust Library
+
+Add `pdf-vdiff` to your `Cargo.toml`:
+
+```bash
+cargo add pdf-vdiff
+```
+
+Or manually:
+
+```toml
+[dependencies]
+pdf-vdiff = "0.1.0"
+```
+
+Programmatic usage in Rust:
+
+```rust
+use pdf_vdiff::{diff_documents, DiffGranularity, PageText};
+
+// Diff page tokens with configurable granularity (Word, Line, Character)
+let diff_result = diff_documents(&base_pages, &tailored_pages, DiffGranularity::Word);
+
+println!(
+    "Detected {} difference(s) across {} page(s)",
+    diff_result.total_differences,
+    diff_result.pages.len()
+);
+```
+
+### Using Nix Flakes
 
 `pdf-vdiff` provides full Nix Flake support (requires Nix 2.4+ with `flakes` and `nix-command` enabled). You can run it instantly without manual installation or dependencies:
 

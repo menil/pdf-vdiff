@@ -7,7 +7,6 @@ db.lock
 
 # Rust
 /target
-Cargo.lock
 *.dylib
 *.so
 *.a
@@ -32,19 +31,16 @@ result
 result-*
 
 # Temp files
-pr.diff
+*.diff
+*.tmp
+*.bak
 
-# Beads (issue tracking)
+# Beads / Dolt (issue tracking)
 .beads/
-
-# Claude Code local overrides (not shared; .claude/settings.json IS tracked)
-.claude/settings.local.json
-
-# Beads / Dolt files (added by bd init)
 .dolt/
 *.db
 .beads-credential-key
-.beads/proxieddb/
-
-# Beads / Dolt files (added by bd init)
 *.gate.lock*
+
+# Claude Code local overrides (not shared; .claude/settings.json IS tracked)
+.claude/settings.local.json

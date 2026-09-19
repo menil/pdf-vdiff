@@ -1,13 +1,20 @@
-//! Synthetic test fixture generator and integration test suite.
+//! Synthetic test fixture generator and size validation suite.
+//!
+//! Generates reproducible, lightweight (< 15 KB) synthetic PDF fixtures
+//! covering critical visual diffing edge cases: identical documents, inline
+//! word/line edits, multi-column reading orders, asymmetric page counts,
+//! and scanned/image-only PDFs lacking text layers.
 
 use pdf_vdiff::pdf::init_pdfium;
 use pdfium_render::prelude::*;
 use std::path::{Path, PathBuf};
 
+/// Returns the path to the committed synthetic test fixtures directory (`tests/fixtures`).
 fn get_fixtures_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures")
 }
 
+/// Creates a new PDF document with `num_pages` using standard US Letter dimensions (612 x 792 pt).
 fn create_pdf_with_pages<'a, F>(
     pdfium: &'a Pdfium,
     num_pages: usize,
@@ -33,6 +40,7 @@ where
     doc
 }
 
+/// Draws a single-line text object at `(x, y)` in PDF coordinate space (origin at bottom-left).
 fn add_text(
     page: &mut PdfPage,
     doc: &PdfDocument,
@@ -56,6 +64,7 @@ fn add_text(
     let _ = obj.set_fill_color(PdfColor::BLACK);
 }
 
+/// Renders a synthetic document via `draw_page` and writes the resulting PDF to `dir/filename`.
 fn create_and_save_fixture<'a, F>(
     dir: &Path,
     filename: &str,
@@ -70,11 +79,19 @@ fn create_and_save_fixture<'a, F>(
         .unwrap_or_else(|e| panic!("failed to save {filename}: {e}"));
 }
 
+/// Generates all standard synthetic test fixtures into the specified target directory.
+///
+/// Fixtures generated:
+/// - `identical_base.pdf` / `identical_target.pdf`: Baseline identity check (diff engine reports zero changes, exit code 0).
+/// - `edit_base.pdf` / `edit_target.pdf`: Inline word substitutions, multi-word insertions, bullet point additions, and deletions.
+/// - `multicolumn_base.pdf` / `multicolumn_target.pdf`: Multi-column spatial layout clustering and reading order verification.
+/// - `page_mismatch_base.pdf` / `page_mismatch_target.pdf`: Unequal page counts (2 pages vs 1 page) and compositor rendering.
+/// - `no_text_image.pdf`: Zero-text vector rectangle triggering `PdfVdiffError::NoTextLayer`.
 pub fn generate_all_fixtures_to_dir(dir: &Path) {
     std::fs::create_dir_all(dir).expect("create fixtures dir");
     let pdfium = init_pdfium().expect("init pdfium");
 
-    // 1. Identical Documents
+    // 1. Identical Documents: Verifies identical baseline content results in no highlights and exit code 0.
     create_and_save_fixture(
         dir,
         "identical_base.pdf",
@@ -382,15 +399,17 @@ pub fn generate_all_fixtures_to_dir(dir: &Path) {
     });
 }
 
+/// Generates all standard synthetic fixtures directly into `tests/fixtures/`.
 pub fn generate_all_fixtures() {
     generate_all_fixtures_to_dir(&get_fixtures_dir());
 }
 
+/// Verifies that all fixtures generate in an isolated temporary directory and satisfy the < 15 KB size limit.
 #[test]
 fn test_generate_fixtures_and_verify_sizes() {
-    generate_all_fixtures();
     let temp_dir = tempfile::tempdir().expect("tempdir");
     generate_all_fixtures_to_dir(temp_dir.path());
+    let fixtures_dir = get_fixtures_dir();
 
     let expected_files = [
         "identical_base.pdf",
@@ -417,11 +436,26 @@ fn test_generate_fixtures_and_verify_sizes() {
         );
 
         // Also verify committed fixture in tests/fixtures/
-        let committed_path = get_fixtures_dir().join(file);
+        let committed_path = fixtures_dir.join(file);
         assert!(
             committed_path.exists(),
             "Missing committed fixture: {:?}",
             committed_path
         );
+        let committed_size = std::fs::metadata(&committed_path).expect("metadata").len();
+        assert!(
+            committed_size > 100 && committed_size < 15_000,
+            "Committed fixture {:?} size {} bytes outside expected range (100B - 15KB)",
+            file,
+            committed_size
+        );
     }
+}
+
+/// Manual utility test to regenerate all committed fixtures into `tests/fixtures/`.
+/// Run explicitly with `cargo test -- --ignored test_regenerate_committed_fixtures`.
+#[test]
+#[ignore]
+fn test_regenerate_committed_fixtures() {
+    generate_all_fixtures();
 }

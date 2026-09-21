@@ -167,6 +167,8 @@ pdf-vdiff [OPTIONS] <BASE_PDF> <TAILORED_PDF>
 | `--no-header` | Suppress the top header/metadata banner | `false` |
 | `--max-pages <NUM>` | Maximum page count threshold to prevent unbounded processing | `250` |
 | `-v, --verbose` | Enable verbose structural logging | `false` |
+| `--generate-completions <SHELL>` | Generate shell completions (`bash`, `zsh`, `fish`, `elvish`, `powershell`) | |
+| `--generate-man` | Generate Section 1 roff man page to stdout | `false` |
 | `-h, --help` | Print help information | |
 | `-V, --version` | Print version information | |
 
@@ -185,6 +187,31 @@ pdf-vdiff base.pdf tailored.pdf -o ./output/diff.pdf --force
 # Remove the top metadata banner and adjust gutter width
 pdf-vdiff v1.pdf v2.pdf --no-header --gutter-width 32.0
 ```
+
+### Shell Completions & Man Pages
+
+Pre-built shell completions and Unix man pages are maintained in [`completions/`](completions/) and [`man/`](man/):
+
+#### Shell Completions
+Generate or source completions on the fly for your active shell:
+
+```bash
+# Bash (add to ~/.bashrc)
+eval "$(pdf-vdiff --generate-completions bash)"
+
+# Zsh (add to ~/.zshrc)
+eval "$(pdf-vdiff --generate-completions zsh)"
+
+# Fish (add to ~/.config/fish/config.fish)
+pdf-vdiff --generate-completions fish | source
+```
+
+#### Man Pages & TLDR
+- **Unix Man Page**: Installed automatically with package managers (`man pdf-vdiff`), or view directly:
+  - **macOS**: `pdf-vdiff --generate-man | mandoc`
+  - **Linux**: `pdf-vdiff --generate-man | man -l -`
+  - **Direct file**: `man man/pdf-vdiff.1`
+- **TLDR Cheatsheet**: Available in [`man/pdf-vdiff.tldr.md`](man/pdf-vdiff.tldr.md).
 
 ### Exit Codes
 

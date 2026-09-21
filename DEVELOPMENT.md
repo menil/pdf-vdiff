@@ -34,6 +34,7 @@ Common development tasks are managed via [`just`](https://github.com/casey/just)
 | `just test` | Run unit and integration tests (single-threaded for PDFium C safety) |
 | `just coverage` | Run `cargo-llvm-cov` with 85% line-coverage threshold |
 | `just build` | Build release binary (`cargo build --release`) |
+| `just generate-assets` | Regenerate man page and shell completion files (`man/`, `completions/`) |
 | `just sync-agent-ignore` | Regenerate `.claude/settings.json` deny rules from `.agentignore` |
 | `just check-agent-ignore-sync` | Check whether `.claude/settings.json` is in sync with `.agentignore` |
 | `just validate` | Run full validation suite (agent sync, lint, test, and coverage) |

@@ -1,4 +1,4 @@
-{ lib, rustPlatform, makeWrapper, pdfium }:
+{ lib, rustPlatform, makeWrapper, installShellFiles, pdfium }:
 
 let
   cargoToml = builtins.fromTOML (builtins.readFile ../Cargo.toml);
@@ -15,6 +15,8 @@ rustPlatform.buildRustPackage {
       ../src
       ../tests
       ../README.md
+      ../man
+      ../completions
     ];
   };
 
@@ -24,6 +26,7 @@ rustPlatform.buildRustPackage {
 
   nativeBuildInputs = [
     makeWrapper
+    installShellFiles
   ];
 
   buildInputs = [
@@ -47,6 +50,12 @@ rustPlatform.buildRustPackage {
       --set-default PDFIUM_LIB_PATH "${pdfium}/lib/libpdfium.${pdfium.ext}" \
       --prefix LD_LIBRARY_PATH : "${pdfium}/lib" \
       --prefix DYLD_LIBRARY_PATH : "${pdfium}/lib"
+
+    installManPage man/pdf-vdiff.1
+    installShellCompletion --cmd pdf-vdiff \
+      --bash completions/pdf-vdiff.bash \
+      --zsh completions/_pdf-vdiff \
+      --fish completions/pdf-vdiff.fish
   '';
 
   meta = with lib; {

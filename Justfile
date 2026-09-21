@@ -25,6 +25,10 @@ coverage:
 build:
     cargo build --release
 
+# Generate man page and shell completion assets
+generate-assets:
+    cargo run --release --bin generate-assets
+
 # Regenerate .claude/settings.json's Read-deny rules from .agentignore
 sync-agent-ignore:
     @scripts/sync-agent-ignore.sh

@@ -31,6 +31,32 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
+      - name: Checkout Release PR Branch
+        if: steps.release.outputs.pr != ''
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ fromJson(steps.release.outputs.pr).headBranchName }}
+
+      - name: Install Rust Toolchain
+        if: steps.release.outputs.pr != ''
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Regenerate Assets for Release PR
+        if: steps.release.outputs.pr != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_BRANCH: ${{ fromJson(steps.release.outputs.pr).headBranchName }}
+        run: |
+          set -euo pipefail
+          cargo run --release --bin generate-assets
+          if [ -n "$(git status --porcelain man/ completions/)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add man/ completions/
+            git commit -m "chore: regenerate assets for release"
+            git push origin "$PR_BRANCH"
+          fi
+
   publish-crate:
     name: Publish to Crates.io
     runs-on: ubuntu-latest

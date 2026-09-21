@@ -1,7 +1,7 @@
 //! CLI entrypoint for `pdf-vdiff`.
 
 use clap::Parser;
-use pdf_vdiff::cli::{path_file_name_or, CliArgs};
+use pdf_vdiff::cli::{path_file_name_or, render_completions, render_man_page, CliArgs};
 use pdf_vdiff::diff::diff_documents;
 use pdf_vdiff::error::PdfVdiffError;
 use pdf_vdiff::layout::{CanvasLayout, PageDimensions};
@@ -10,12 +10,38 @@ use std::process::ExitCode;
 
 /// Core execution routine for CLI invocation.
 pub fn run(args: CliArgs) -> Result<i32, PdfVdiffError> {
-    // 1. Pre-flight input existence checks
-    if !args.base_pdf.exists() {
-        return Err(PdfVdiffError::FileNotFound(args.base_pdf));
+    // 0. Handle shell completions and man page generation flags
+    if let Some(shell) = args.generate_completions {
+        let mut stdout = std::io::stdout();
+        render_completions(shell, &mut stdout).map_err(|e| PdfVdiffError::OutputIo {
+            path: std::path::PathBuf::from("<stdout>"),
+            source: e,
+        })?;
+        return Ok(0);
     }
-    if !args.tailored_pdf.exists() {
-        return Err(PdfVdiffError::FileNotFound(args.tailored_pdf));
+
+    if args.generate_man {
+        let mut stdout = std::io::stdout();
+        render_man_page(&mut stdout).map_err(|e| PdfVdiffError::OutputIo {
+            path: std::path::PathBuf::from("<stdout>"),
+            source: e,
+        })?;
+        return Ok(0);
+    }
+
+    let base_pdf = args.base_pdf.as_ref().ok_or_else(|| {
+        PdfVdiffError::FileNotFound(std::path::PathBuf::from("<missing BASE_PDF>"))
+    })?;
+    let tailored_pdf = args.tailored_pdf.as_ref().ok_or_else(|| {
+        PdfVdiffError::FileNotFound(std::path::PathBuf::from("<missing TAILORED_PDF>"))
+    })?;
+
+    // 1. Pre-flight input existence checks
+    if !base_pdf.exists() {
+        return Err(PdfVdiffError::FileNotFound(base_pdf.clone()));
+    }
+    if !tailored_pdf.exists() {
+        return Err(PdfVdiffError::FileNotFound(tailored_pdf.clone()));
     }
 
     let output_path = args.resolve_output_path();
@@ -24,7 +50,7 @@ pub fn run(args: CliArgs) -> Result<i32, PdfVdiffError> {
     }
 
     if args.verbose {
-        eprintln!("Comparing: {:?} vs {:?}", args.base_pdf, args.tailored_pdf);
+        eprintln!("Comparing: {:?} vs {:?}", base_pdf, tailored_pdf);
         eprintln!(
             "Theme: {:?}, Granularity: {:?}",
             args.theme, args.granularity
@@ -35,19 +61,21 @@ pub fn run(args: CliArgs) -> Result<i32, PdfVdiffError> {
     let pdfium = init_pdfium()?;
 
     // 3. Load input documents
-    let base_doc = pdfium
-        .load_pdf_from_file(&args.base_pdf, None)
-        .map_err(|e| PdfVdiffError::PdfOpen {
-            path: args.base_pdf.clone(),
-            reason: e.to_string(),
-        })?;
+    let base_doc =
+        pdfium
+            .load_pdf_from_file(base_pdf, None)
+            .map_err(|e| PdfVdiffError::PdfOpen {
+                path: base_pdf.clone(),
+                reason: e.to_string(),
+            })?;
 
-    let tailored_doc = pdfium
-        .load_pdf_from_file(&args.tailored_pdf, None)
-        .map_err(|e| PdfVdiffError::PdfOpen {
-            path: args.tailored_pdf.clone(),
-            reason: e.to_string(),
-        })?;
+    let tailored_doc =
+        pdfium
+            .load_pdf_from_file(tailored_pdf, None)
+            .map_err(|e| PdfVdiffError::PdfOpen {
+                path: tailored_pdf.clone(),
+                reason: e.to_string(),
+            })?;
 
     // 4. Extract tokens from documents
     let base_pages = extract_document_tokens(&base_doc, args.max_pages)?;
@@ -57,7 +85,7 @@ pub fn run(args: CliArgs) -> Result<i32, PdfVdiffError> {
     let total_tailored_tokens: usize = tailored_pages.iter().map(|p| p.tokens.len()).sum();
 
     if total_base_tokens == 0 && total_tailored_tokens == 0 {
-        return Err(PdfVdiffError::NoTextLayer(args.base_pdf));
+        return Err(PdfVdiffError::NoTextLayer(base_pdf.clone()));
     }
 
     // 5. Compute hierarchical sequence diff
@@ -91,8 +119,8 @@ pub fn run(args: CliArgs) -> Result<i32, PdfVdiffError> {
     }
 
     // 6. Setup compositor and render 4-layer vector canvas
-    let base_name = path_file_name_or(&args.base_pdf, "Base");
-    let tailored_name = path_file_name_or(&args.tailored_pdf, "Tailored");
+    let base_name = path_file_name_or(base_pdf, "Base");
+    let tailored_name = path_file_name_or(tailored_pdf, "Tailored");
 
     let header_meta = HeaderMetadata {
         base_name,
@@ -138,13 +166,13 @@ pub fn run(args: CliArgs) -> Result<i32, PdfVdiffError> {
     if diff_result.has_differences {
         println!(
             "Differences detected between {:?} and {:?}",
-            args.base_pdf, args.tailored_pdf
+            base_pdf, tailored_pdf
         );
         Ok(1)
     } else {
         println!(
             "Documents {:?} and {:?} are identical.",
-            args.base_pdf, args.tailored_pdf
+            base_pdf, tailored_pdf
         );
         Ok(0)
     }
@@ -166,6 +194,7 @@ fn main() -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use clap_complete::Shell;
     use pdf_vdiff::theme::ThemeKind;
     use pdfium_render::prelude::*;
     use std::path::PathBuf;
@@ -215,10 +244,10 @@ mod tests {
     }
 
     #[test]
-    fn test_run_missing_input_file() {
+    fn test_run_generate_completions() {
         let args = CliArgs {
-            base_pdf: PathBuf::from("non_existent_base_file_12345.pdf"),
-            tailored_pdf: PathBuf::from("non_existent_tailored_file_12345.pdf"),
+            base_pdf: None,
+            tailored_pdf: None,
             output: None,
             force: false,
             open: false,
@@ -228,6 +257,52 @@ mod tests {
             no_header: false,
             max_pages: 250,
             verbose: false,
+            generate_completions: Some(Shell::Bash),
+            generate_man: false,
+        };
+
+        let res = run(args);
+        assert_eq!(res.unwrap(), 0);
+    }
+
+    #[test]
+    fn test_run_generate_man() {
+        let args = CliArgs {
+            base_pdf: None,
+            tailored_pdf: None,
+            output: None,
+            force: false,
+            open: false,
+            theme: ThemeKind::IntelliJ,
+            granularity: pdf_vdiff::diff::DiffGranularity::Word,
+            gutter_width: 24.0,
+            no_header: false,
+            max_pages: 250,
+            verbose: false,
+            generate_completions: None,
+            generate_man: true,
+        };
+
+        let res = run(args);
+        assert_eq!(res.unwrap(), 0);
+    }
+
+    #[test]
+    fn test_run_missing_input_file() {
+        let args = CliArgs {
+            base_pdf: Some(PathBuf::from("non_existent_base_file_12345.pdf")),
+            tailored_pdf: Some(PathBuf::from("non_existent_tailored_file_12345.pdf")),
+            output: None,
+            force: false,
+            open: false,
+            theme: ThemeKind::IntelliJ,
+            granularity: pdf_vdiff::diff::DiffGranularity::Word,
+            gutter_width: 24.0,
+            no_header: false,
+            max_pages: 250,
+            verbose: false,
+            generate_completions: None,
+            generate_man: false,
         };
 
         let res = run(args);
@@ -252,8 +327,8 @@ mod tests {
         std::fs::write(&output, b"existing output").expect("write output");
 
         let args = CliArgs {
-            base_pdf: base,
-            tailored_pdf: tailored,
+            base_pdf: Some(base),
+            tailored_pdf: Some(tailored),
             output: Some(output.clone()),
             force: false,
             open: false,
@@ -263,6 +338,8 @@ mod tests {
             no_header: false,
             max_pages: 250,
             verbose: false,
+            generate_completions: None,
+            generate_man: false,
         };
 
         let res = run(args);
@@ -286,8 +363,8 @@ mod tests {
         write_test_pdf(&tailored, &["Lead Systems Architect", "Rust, C++, and Go"]);
 
         let args = CliArgs {
-            base_pdf: base,
-            tailored_pdf: tailored,
+            base_pdf: Some(base),
+            tailored_pdf: Some(tailored),
             output: Some(output.clone()),
             force: true,
             open: false,
@@ -297,6 +374,8 @@ mod tests {
             no_header: false,
             max_pages: 250,
             verbose: true,
+            generate_completions: None,
+            generate_man: false,
         };
 
         let res = run(args);
@@ -315,8 +394,8 @@ mod tests {
         write_test_pdf(&tailored, &["Identical Document Content"]);
 
         let args = CliArgs {
-            base_pdf: base,
-            tailored_pdf: tailored,
+            base_pdf: Some(base),
+            tailored_pdf: Some(tailored),
             output: Some(output.clone()),
             force: true,
             open: false,
@@ -326,6 +405,8 @@ mod tests {
             no_header: true,
             max_pages: 50,
             verbose: false,
+            generate_completions: None,
+            generate_man: false,
         };
 
         let res = run(args);
@@ -344,8 +425,8 @@ mod tests {
         write_empty_page_pdf(&tailored);
 
         let args = CliArgs {
-            base_pdf: base.clone(),
-            tailored_pdf: tailored,
+            base_pdf: Some(base.clone()),
+            tailored_pdf: Some(tailored),
             output: Some(output),
             force: true,
             open: false,
@@ -355,6 +436,8 @@ mod tests {
             no_header: false,
             max_pages: 250,
             verbose: false,
+            generate_completions: None,
+            generate_man: false,
         };
 
         let res = run(args);
@@ -375,8 +458,8 @@ mod tests {
         write_test_pdf(&tailored, &["Valid content"]);
 
         let args = CliArgs {
-            base_pdf: base.clone(),
-            tailored_pdf: tailored,
+            base_pdf: Some(base.clone()),
+            tailored_pdf: Some(tailored),
             output: None,
             force: true,
             open: false,
@@ -386,6 +469,8 @@ mod tests {
             no_header: false,
             max_pages: 250,
             verbose: false,
+            generate_completions: None,
+            generate_man: false,
         };
 
         let res = run(args);

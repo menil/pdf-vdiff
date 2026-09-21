@@ -21,6 +21,8 @@ path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4", features = ["derive", "cargo"] }
+clap_complete = "4"
+clap_mangen = "0.2"
 pdfium-render = "0.9"
 similar = { version = "2", features = ["unicode"] }
 unicode-normalization = "0.1"

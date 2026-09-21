@@ -1,6 +1,6 @@
 [package]
 name = "pdf-vdiff"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Meni Livne <meni@livne.org>"]
 description = "A fast, standalone CLI tool for side-by-side visual PDF diffing"

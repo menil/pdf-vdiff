@@ -53,8 +53,8 @@ jobs:
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
             git add man/ completions/
-            git commit -m "chore: regenerate assets for release"
-            git push origin "$PR_BRANCH"
+            git commit --amend --no-edit
+            git push --force-with-lease origin "$PR_BRANCH"
           fi
 
   publish-crate:

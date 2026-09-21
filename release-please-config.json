@@ -8,21 +8,7 @@
       "bump-minor-pre-major": true,
       "bump-patch-for-minor-pre-major": true,
       "extra-files": [
-        {
-          "type": "generic",
-          "path": "README.md",
-          "pattern": "pdf-vdiff = \"${version}\""
-        },
-        {
-          "type": "generic",
-          "path": "man/pdf-vdiff.1",
-          "pattern": "pdf-vdiff ${version}"
-        },
-        {
-          "type": "generic",
-          "path": "man/pdf-vdiff.1",
-          "pattern": "v${version}"
-        }
+        "README.md"
       ]
     }
   }

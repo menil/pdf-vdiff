@@ -1,0 +1,99 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH pdf-vdiff 1  "pdf-vdiff 0.1.0" 
+.SH NAME
+pdf\-vdiff \- Side\-by\-side visual PDF diffing tool preserving vector fidelity and searchability
+.SH SYNOPSIS
+\fBpdf\-vdiff\fR [\fB\-o\fR|\fB\-\-output\fR] [\fB\-f\fR|\fB\-\-force\fR] [\fB\-\-open\fR] [\fB\-\-theme\fR] [\fB\-\-granularity\fR] [\fB\-\-gutter\-width\fR] [\fB\-\-no\-header\fR] [\fB\-\-max\-pages\fR] [\fB\-v\fR|\fB\-\-verbose\fR] [\fB\-\-generate\-completions\fR] [\fB\-\-generate\-man\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] [\fIBASE_PDF\fR] [\fITAILORED_PDF\fR] 
+.SH DESCRIPTION
+A fast, standalone CLI tool that takes two PDF documents (e.g. base and tailored resumes) and produces a single side\-by\-side landscape PDF with IntelliJ/GitHub\-style visual diff highlighting.
+.SH OPTIONS
+.TP
+\fB\-o\fR, \fB\-\-output\fR \fI<PATH>\fR
+Target output PDF file path [default: <base_stem>_vs_<tailored_stem>_diff.pdf]
+.TP
+\fB\-f\fR, \fB\-\-force\fR
+Overwrite destination output file if it already exists
+.TP
+\fB\-\-open\fR
+Automatically open the generated diff in the system default PDF viewer
+.TP
+\fB\-\-theme\fR \fI<THEME>\fR [default: intellij]
+Color palette theme (intellij, github, classic, high\-contrast)
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+intellij: Soft IntelliJ\-style red/green diff colors (Default)
+.IP \(bu 2
+github: Clean GitHub\-style split diff colors
+.IP \(bu 2
+classic: Traditional vibrant red/green diff colors
+.IP \(bu 2
+high\-contrast: High\-contrast palette for maximum visual accessibility
+.RE
+.TP
+\fB\-\-granularity\fR \fI<GRANULARITY>\fR [default: word]
+Diff granularity mode (word, line, character)
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+word: Diff by word tokens (Default)
+.IP \(bu 2
+line: Diff by full lines
+.IP \(bu 2
+character: Diff by individual characters/glyphs
+.RE
+.TP
+\fB\-\-gutter\-width\fR \fI<GUTTER_WIDTH>\fR [default: 24]
+Spacing in points between left and right pages
+.TP
+\fB\-\-no\-header\fR
+Suppress the top header/metadata banner
+.TP
+\fB\-\-max\-pages\fR \fI<MAX_PAGES>\fR [default: 250]
+Maximum page count threshold to prevent unbounded processing
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+Enable verbose structural logging (omits sensitive raw text PII)
+.TP
+\fB\-\-generate\-completions\fR \fI<SHELL>\fR
+Generate shell completion script to stdout (bash, zsh, fish, elvish, powershell)
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+bash
+.IP \(bu 2
+elvish
+.IP \(bu 2
+fish
+.IP \(bu 2
+powershell
+.IP \(bu 2
+zsh
+.RE
+.TP
+\fB\-\-generate\-man\fR
+Generate roff man page (Section 1) to stdout
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help (see a summary with \*(Aq\-h\*(Aq)
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+Print version
+.TP
+[\fIBASE_PDF\fR]
+Path to the original / base PDF document
+.TP
+[\fITAILORED_PDF\fR]
+Path to the modified / tailored PDF document
+.SH VERSION
+v0.1.0

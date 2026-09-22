@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/menil/pdf-vdiff/compare/pdf-vdiff-v0.1.2...pdf-vdiff-v0.1.3) (2026-09-22)
+
+
+### Bug Fixes
+
+* **ci:** handle empty release PR output and add workflow_dispatch ([5b7a4a6](https://github.com/menil/pdf-vdiff/commit/5b7a4a65eea869e2f19ea125aa4a18836dcdeb04))
+
 ## [0.1.2](https://github.com/menil/pdf-vdiff/compare/pdf-vdiff-v0.1.1...pdf-vdiff-v0.1.2) (2026-09-22)
 
 

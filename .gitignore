@@ -1,0 +1,46 @@
+# OS files
+.DS_Store
+Thumbs.db
+db.lock
+*.tmp
+*.bak
+
+# Rust
+/target
+*.dylib
+*.so
+*.a
+
+# Private / Local Testing Fixtures (Never commit real PII documents)
+tests/fixtures_private/
+*.local.pdf
+private/
+
+# IDEs
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Nix
+.direnv/
+result
+result-*
+
+# Temp files
+*.diff
+*.tmp
+*.bak
+
+# Beads / Dolt (issue tracking)
+.beads/
+.dolt/
+*.db
+.beads-credential-key
+*.gate.lock*
+
+# Claude Code local overrides (not shared; .claude/settings.json IS tracked)
+.claude/settings.local.json

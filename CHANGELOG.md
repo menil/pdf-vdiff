@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/menil/pdf-vdiff/compare/pdf-vdiff-v0.1.1...pdf-vdiff-v0.1.2) (2026-09-22)
+
+
+### Bug Fixes
+
+* sync man page for v0.1.1 and automate release asset generation ([25d8121](https://github.com/menil/pdf-vdiff/commit/25d81218cb86a5bbee342158536685d778118b29))
+
 ## [0.1.1](https://github.com/menil/pdf-vdiff/compare/pdf-vdiff-v0.1.0...pdf-vdiff-v0.1.1) (2026-09-21)
 
 

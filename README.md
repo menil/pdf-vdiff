@@ -67,7 +67,7 @@ Or manually:
 
 ```toml
 [dependencies]
-pdf-vdiff = "0.1.1" # x-release-please-version
+pdf-vdiff = "0.1.2" # x-release-please-version
 ```
 
 Programmatic usage in Rust:

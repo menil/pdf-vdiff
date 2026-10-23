@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.4](https://github.com/menil/pdf-vdiff/compare/pdf-vdiff-v0.1.3...pdf-vdiff-v0.1.4) (2026-10-23)
+
+
+### Bug Fixes
+
+* **nix:** pin shell.nix nixpkgs to flake.lock revision ([103c17a](https://github.com/menil/pdf-vdiff/commit/103c17aa2af68a75227b78d2ed3500237ebd5f86))
+* **nix:** use rustc.llvmPackages.llvm for coverage tools ([b7cf67b](https://github.com/menil/pdf-vdiff/commit/b7cf67b3d976d9f46d2bffe542195dc648e16038))
+
 ## [0.1.3](https://github.com/menil/pdf-vdiff/compare/pdf-vdiff-v0.1.2...pdf-vdiff-v0.1.3) (2026-09-22)
 
 

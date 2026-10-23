@@ -31,7 +31,7 @@ jobs:
       version: ${{ steps.release.outputs.version }}
     steps:
       - name: Run Release Please
-        uses: googleapis/release-please-action@v4
+        uses: googleapis/release-please-action@v5
         id: release
         with:
           config-file: release-please-config.json
@@ -42,7 +42,7 @@ jobs:
       # fromJson() template evaluation errors when steps.release.outputs.pr is empty.
       - name: Checkout Release PR Branch
         if: steps.release.outputs.pr != ''
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ fromJson(steps.release.outputs.pr || '{}').headBranchName }}
           fetch-depth: 0
@@ -74,7 +74,7 @@ jobs:
     if: needs.release-please.outputs.releases_created == 'true' || inputs.publish_current == true
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Rust Toolchain
         uses: dtolnay/rust-toolchain@stable

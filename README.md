@@ -5,7 +5,7 @@
 [![CI](https://github.com/menil/pdf-vdiff/actions/workflows/validate.yml/badge.svg)](https://github.com/menil/pdf-vdiff/actions/workflows/validate.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-A fast, standalone CLI tool for side-by-side visual PDF diffing, designed primarily to inspect and verify changes between a base resume/CV and an AI-tailored version while preserving 100% vector fidelity and text searchability. It is used by [JobGitOps](https://github.com/menil/JobGitOps) to inspect resume diffs before submission.
+A fast, standalone CLI tool for side-by-side visual PDF diffing, designed primarily to inspect and verify changes between a base resume/CV and an AI-tailored version while preserving 100% vector fidelity and text searchability. It is used by [GitEmployed](https://github.com/menil/GitEmployed) to inspect resume diffs before submission.
 
 `pdf-vdiff` compares two PDF documents (such as your canonical base resume/CV and an AI-customized version for a job application) and generates a single side-by-side landscape PDF with IntelliJ/GitHub-style visual diff highlighting. It allows you to immediately spot reworded bullet points, added keywords, and omitted sections before submitting your application.
 

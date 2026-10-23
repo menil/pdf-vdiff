@@ -26,11 +26,11 @@ path = "src/bin/generate_assets.rs"
 [dependencies]
 clap = { version = "4", features = ["derive", "cargo"] }
 clap_complete = "4"
-clap_mangen = "0.2"
+clap_mangen = "0.3"
 pdfium-render = "0.9"
-similar = { version = "2", features = ["unicode"] }
+similar = { version = "3", features = ["unicode"] }
 unicode-normalization = "0.1"
-thiserror = "1"
+thiserror = "2"
 anyhow = "1"
 open = "5"
 tempfile = "3"

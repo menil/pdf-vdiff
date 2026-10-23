@@ -22,14 +22,17 @@ pkgs.mkShell {
     clippy
     rustfmt
     cargo-llvm-cov
-    llvmPackages.llvm
+    # Use rustc's paired LLVM rather than the default system LLVM so
+    # llvm-cov and llvm-profdata always match the .profraw format version
+    # emitted by rustc -C instrument-coverage.
+    rustc.llvmPackages.llvm
     pkg-config
     pdfium
   ];
 
   shellHook = ''
-    export LLVM_COV="${pkgs.llvmPackages.llvm}/bin/llvm-cov"
-    export LLVM_PROFDATA="${pkgs.llvmPackages.llvm}/bin/llvm-profdata"
+    export LLVM_COV="${pkgs.rustc.llvmPackages.llvm}/bin/llvm-cov"
+    export LLVM_PROFDATA="${pkgs.rustc.llvmPackages.llvm}/bin/llvm-profdata"
     export PDFIUM_LIB_DIR="${pdfium}/lib"
     export PDFIUM_LIB_PATH="${pdfium}/lib/libpdfium.${pdfium.ext}"
     export LD_LIBRARY_PATH="${pdfium}/lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"

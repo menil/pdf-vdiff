@@ -59,6 +59,17 @@ Pre-built, self-contained binary archives bundled with Google's PDFium dynamic l
 
 These archives require **zero external dependencies** or compiler toolchains: extract the archive and run `./pdf-vdiff` directly (or place `pdf-vdiff` and its companion library `libpdfium` / `pdfium.dll` together in the same directory on your `$PATH`, such as `~/.local/bin`). On macOS, if downloaded via a web browser, clear the quarantine attribute if prompted: `xattr -d com.apple.quarantine pdf-vdiff libpdfium.dylib`.
 
+### Fast Install via `cargo-binstall`
+
+If you have [`cargo-binstall`](https://github.com/cargo-bins/cargo-binstall) installed, you can fetch and install pre-compiled binaries in seconds without compiling from source:
+
+```bash
+cargo binstall pdf-vdiff
+```
+
+> [!NOTE]
+> `cargo-binstall` installs only the executable binary into `$CARGO_HOME/bin/`. Like `cargo install`, running the binary requires Google's PDFium dynamic library on your system search path (e.g. `brew install bblanchon/pdfium/pdfium-binaries` on macOS) or via `PDFIUM_LIB_PATH`. For a completely self-contained installation with zero system dependencies, use the pre-compiled binary archives above or Nix Flakes below.
+
 ### CLI via Cargo (Crates.io)
 
 ```bash

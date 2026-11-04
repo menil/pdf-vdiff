@@ -11,6 +11,15 @@ homepage = "https://github.com/menil/pdf-vdiff"
 keywords = ["pdf", "diff", "visual-diff", "resume", "vector"]
 categories = ["command-line-utilities", "text-processing"]
 
+[package.metadata.binstall]
+pkg-url = "{ repo }/releases/download/{ name }-v{ version }/{ name }-v{ version }-{ target }.tar.gz"
+bin-dir = "{ name }-v{ version }-{ target }/{ bin }{ binary-ext }"
+pkg-fmt = "tgz"
+
+[package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
+pkg-url = "{ repo }/releases/download/{ name }-v{ version }/{ name }-v{ version }-{ target }.zip"
+pkg-fmt = "zip"
+
 [lib]
 name = "pdf_vdiff"
 path = "src/lib.rs"

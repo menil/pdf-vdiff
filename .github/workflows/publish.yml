@@ -20,6 +20,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  PDFIUM_VERSION: "7881"
+
 jobs:
   release-please:
     name: Release Please
@@ -83,3 +86,230 @@ jobs:
         uses: katyo/publish-crates@v2
         with:
           registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+  prepare-release:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    needs: release-please
+    if: needs.release-please.outputs.releases_created == 'true' || inputs.publish_current == true
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.get-version.outputs.version }}
+      tag_name: ${{ steps.get-version.outputs.tag_name }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+
+      - name: Resolve Version and Tag
+        id: get-version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASES_CREATED: ${{ needs.release-please.outputs.releases_created }}
+          RELEASE_VERSION: ${{ needs.release-please.outputs.version }}
+          RELEASE_TAG: ${{ needs.release-please.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          if [ "${RELEASES_CREATED}" = "true" ] && [ -n "${RELEASE_VERSION}" ]; then
+            VERSION="${RELEASE_VERSION}"
+            TAG_NAME="${RELEASE_TAG}"
+          else
+            VERSION=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')
+            TAG_NAME="pdf-vdiff-v${VERSION}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag_name=${TAG_NAME}" >> "$GITHUB_OUTPUT"
+
+          # Ensure the release exists if triggered via workflow_dispatch
+          if ! gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            gh release create "$TAG_NAME" --title "$TAG_NAME" --notes "Release $TAG_NAME"
+          fi
+
+  build-release-assets:
+    name: Build Release Assets (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    needs: prepare-release
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            pdfium_archive: pdfium-linux-x64.tgz
+            pdfium_sha256: "1470e21b8b4a3b4ad7f85684e2da11d94f3b69a86d81dee11b9b6709d927ac1d"
+            pdfium_lib_source: lib/libpdfium.so
+            pdfium_lib_dest: libpdfium.so
+            archive_ext: tar.gz
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            pdfium_archive: pdfium-linux-arm64.tgz
+            pdfium_sha256: "ee7f7b7d5468958336a818c1cd580bdd20972846b7377b13f9a923d92d1d4674"
+            pdfium_lib_source: lib/libpdfium.so
+            pdfium_lib_dest: libpdfium.so
+            archive_ext: tar.gz
+            use_cross_linker: true
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            pdfium_archive: pdfium-mac-x64.tgz
+            pdfium_sha256: "6dedf83990e0e3d6b7c93c9e7589c5a126b0ae14b7464d76120cff7a26afb18b"
+            pdfium_lib_source: lib/libpdfium.dylib
+            pdfium_lib_dest: libpdfium.dylib
+            archive_ext: tar.gz
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            pdfium_archive: pdfium-mac-arm64.tgz
+            pdfium_sha256: "52e94ca5aa8847934330daf3f8150c190682c5ca93831468794f8b90d4392e40"
+            pdfium_lib_source: lib/libpdfium.dylib
+            pdfium_lib_dest: libpdfium.dylib
+            archive_ext: tar.gz
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            pdfium_archive: pdfium-win-x64.tgz
+            pdfium_sha256: "73cc0de638ac2095e7445bf56a38200a5b7c7ca0e9f4ba144598f2457377ac08"
+            pdfium_lib_source: bin/pdfium.dll
+            pdfium_lib_dest: pdfium.dll
+            archive_ext: zip
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install Linux Cross Linker
+        if: matrix.use_cross_linker == true
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Build Binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Cross-compiling aarch64-linux on an x86_64 runner requires explicit cross-linker configuration.
+          if [ "${{ matrix.use_cross_linker }}" = "true" ]; then
+            export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc
+          fi
+          # Build only the CLI binary to avoid redundant multi-platform compilation of generate-assets
+          cargo build --release --bin pdf-vdiff --target ${{ matrix.target }}
+
+      - name: Package Release Archive (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        env:
+          VERSION: ${{ needs.prepare-release.outputs.version }}
+          TARGET: ${{ matrix.target }}
+          PDFIUM_ARCHIVE: ${{ matrix.pdfium_archive }}
+          PDFIUM_SHA256: ${{ matrix.pdfium_sha256 }}
+          PDFIUM_LIB_SOURCE: ${{ matrix.pdfium_lib_source }}
+          PDFIUM_LIB_DEST: ${{ matrix.pdfium_lib_dest }}
+        run: |
+          set -euo pipefail
+          DIR_NAME="pdf-vdiff-v${VERSION}-${TARGET}"
+          mkdir -p "${DIR_NAME}/completions" "${DIR_NAME}/man"
+
+          # Copy executable
+          cp "target/${TARGET}/release/pdf-vdiff" "${DIR_NAME}/"
+
+          # Fetch and cryptographically verify matching PDFium binary
+          # Placing the library adjacent to the binary allows executable-directory resolution
+          # to find it portably without requiring system-level library installation.
+          curl -fsSL --retry 5 --retry-connrefused --retry-delay 2 \
+            "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium/${PDFIUM_VERSION}/${PDFIUM_ARCHIVE}" \
+            -o pdfium.tgz
+          if command -v sha256sum >/dev/null 2>&1; then
+            echo "${PDFIUM_SHA256}  pdfium.tgz" | sha256sum -c -
+          else
+            echo "${PDFIUM_SHA256}  pdfium.tgz" | shasum -a 256 -c -
+          fi
+          tar -xzf pdfium.tgz "${PDFIUM_LIB_SOURCE}"
+          cp "${PDFIUM_LIB_SOURCE}" "${DIR_NAME}/${PDFIUM_LIB_DEST}"
+
+          # Copy documentation, completions, and man page
+          cp README.md LICENSE "${DIR_NAME}/"
+          cp completions/* "${DIR_NAME}/completions/"
+          cp man/* "${DIR_NAME}/man/"
+
+          # Create tarball and sha256 checksum
+          ARCHIVE_NAME="${DIR_NAME}.tar.gz"
+          tar -czf "${ARCHIVE_NAME}" "${DIR_NAME}"
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum "${ARCHIVE_NAME}" > "${ARCHIVE_NAME}.sha256"
+          else
+            shasum -a 256 "${ARCHIVE_NAME}" > "${ARCHIVE_NAME}.sha256"
+          fi
+
+      - name: Package Release Archive (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.prepare-release.outputs.version }}
+          TARGET: ${{ matrix.target }}
+          PDFIUM_ARCHIVE: ${{ matrix.pdfium_archive }}
+          PDFIUM_SHA256: ${{ matrix.pdfium_sha256 }}
+          PDFIUM_LIB_SOURCE: ${{ matrix.pdfium_lib_source }}
+          PDFIUM_LIB_DEST: ${{ matrix.pdfium_lib_dest }}
+        run: |
+          $DirName = "pdf-vdiff-v$env:VERSION-$env:TARGET"
+          New-Item -ItemType Directory -Force -Path "$DirName\completions", "$DirName\man" | Out-Null
+
+          # Copy executable
+          Copy-Item "target\$env:TARGET\release\pdf-vdiff.exe" "$DirName\"
+
+          # Fetch and verify matching PDFium binary
+          $Url = "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium/$env:PDFIUM_VERSION/$env:PDFIUM_ARCHIVE"
+          Invoke-WebRequest -Uri $Url -OutFile "pdfium.tgz" -MaximumRetryCount 5 -RetryIntervalSec 2
+          $ActualHash = (Get-FileHash -Algorithm SHA256 "pdfium.tgz").Hash.ToLower()
+          if ($ActualHash -ne $env:PDFIUM_SHA256.ToLower()) {
+            Write-Error "PDFium checksum mismatch! Expected: $env:PDFIUM_SHA256, got: $ActualHash"
+            exit 1
+          }
+          tar -xzf pdfium.tgz "$env:PDFIUM_LIB_SOURCE"
+          Copy-Item "$env:PDFIUM_LIB_SOURCE" "$DirName\$env:PDFIUM_LIB_DEST"
+
+          # Copy documentation, completions, and man page
+          Copy-Item README.md, LICENSE "$DirName\"
+          Copy-Item completions\* "$DirName\completions\"
+          Copy-Item man\* "$DirName\man\"
+
+          # Create zip and sha256 checksum
+          $ArchiveName = "$DirName.zip"
+          Compress-Archive -Path "$DirName" -DestinationPath "$ArchiveName" -Force
+          $Hash = (Get-FileHash -Algorithm SHA256 "$ArchiveName").Hash.ToLower()
+          "$Hash  $ArchiveName" | Out-File -Encoding ascii "$ArchiveName.sha256"
+
+      - name: Upload Asset to GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ needs.prepare-release.outputs.tag_name }}
+          VERSION: ${{ needs.prepare-release.outputs.version }}
+          TARGET: ${{ matrix.target }}
+          EXT: ${{ matrix.archive_ext }}
+        run: |
+          set -euo pipefail
+          ARCHIVE="pdf-vdiff-v${VERSION}-${TARGET}.${EXT}"
+          gh release upload "${TAG_NAME}" "${ARCHIVE}" "${ARCHIVE}.sha256" --clobber
+
+  release-checksums:
+    name: Generate Combined Checksums
+    runs-on: ubuntu-latest
+    needs: [prepare-release, build-release-assets]
+    permissions:
+      contents: write
+    steps:
+      - name: Aggregate and Upload SHA256SUMS.txt
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG_NAME: ${{ needs.prepare-release.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p release-files
+          cd release-files
+          gh release download "${TAG_NAME}" --pattern "*.tar.gz" --pattern "*.zip"
+          sha256sum *.tar.gz *.zip > SHA256SUMS.txt
+          gh release upload "${TAG_NAME}" SHA256SUMS.txt --clobber

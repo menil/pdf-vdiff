@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5](https://github.com/menil/pdf-vdiff/compare/pdf-vdiff-v0.1.4...pdf-vdiff-v0.1.5) (2026-11-04)
+
+
+### Bug Fixes
+
+* **ci:** use auto provider for automated fallback in PR review workflow ([227575c](https://github.com/menil/pdf-vdiff/commit/227575c6902092f4801e7fe1f5fe14701cf0ad4c))
+
 ## [0.1.4](https://github.com/menil/pdf-vdiff/compare/pdf-vdiff-v0.1.3...pdf-vdiff-v0.1.4) (2026-10-23)
 
 

@@ -49,11 +49,28 @@ pdf-vdiff example/resume_base.pdf example/resume_tailored.pdf -o example/resume_
 
 ## Installation & Setup
 
+### Pre-compiled Standalone Binaries (Recommended)
+
+Pre-built, self-contained binary archives bundled with Google's PDFium dynamic library, shell completions, and man pages are available on the [GitHub Releases](https://github.com/menil/pdf-vdiff/releases) page for:
+
+- **macOS** (Apple Silicon `aarch64` & Intel `x86_64`)
+- **Linux** (x86_64 & AArch64 glibc)
+- **Windows** (x86_64)
+
+These archives require **zero external dependencies** or compiler toolchains: extract the archive and run `./pdf-vdiff` directly (or place `pdf-vdiff` and its companion library `libpdfium` / `pdfium.dll` together in the same directory on your `$PATH`, such as `~/.local/bin`). On macOS, if downloaded via a web browser, clear the quarantine attribute if prompted: `xattr -d com.apple.quarantine pdf-vdiff libpdfium.dylib`.
+
 ### CLI via Cargo (Crates.io)
 
 ```bash
 cargo install pdf-vdiff
 ```
+
+> [!NOTE]
+> Compiling via `cargo install` or building from source links to Google's PDFium dynamic library at runtime. Ensure `libpdfium.dylib` (macOS), `libpdfium.so` (Linux), or `pdfium.dll` (Windows) is available on your system search path (such as `/opt/homebrew/lib` or `/usr/local/lib`), or configure `PDFIUM_LIB_PATH` or `PDFIUM_LIB_DIR`. On macOS with Homebrew:
+> ```bash
+> brew install bblanchon/pdfium/pdfium-binaries
+> ```
+> For an out-of-the-box setup with zero external library configuration, use the pre-compiled binary packages or Nix Flakes below.
 
 ### As a Rust Library
 

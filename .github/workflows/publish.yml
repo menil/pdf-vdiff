@@ -62,7 +62,7 @@ jobs:
           PR_BRANCH: ${{ fromJson(steps.release.outputs.pr || '{}').headBranchName }}
         run: |
           set -euo pipefail
-          cargo run --release --bin generate-assets
+          cargo run --release --bin generate-assets --features generate-assets
           if [ -n "$(git status --porcelain man/ completions/)" ]; then
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"

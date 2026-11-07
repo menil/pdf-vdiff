@@ -11,15 +11,15 @@ format: sync-agent-ignore
 # Run code and markdown linting checks
 lint:
     cargo fmt --check
-    cargo clippy --all-targets -- -D warnings
+    cargo clippy --all-targets --all-features -- -D warnings
 
 # Run all unit and integration tests (single-threaded due to PDFium C library global state)
 test:
-    cargo test -- --test-threads=1
+    cargo test --all-features -- --test-threads=1
 
 # Run code coverage with fail-under threshold (single-threaded due to PDFium C library global state)
 coverage:
-    cargo llvm-cov --fail-under-lines 85 -- --test-threads=1
+    cargo llvm-cov --all-features --fail-under-lines 85 -- --test-threads=1
 
 # Build release binary
 build:
@@ -27,7 +27,7 @@ build:
 
 # Generate man page and shell completion assets
 generate-assets:
-    cargo run --release --bin generate-assets
+    cargo run --release --bin generate-assets --features generate-assets
 
 # Regenerate .claude/settings.json's Read-deny rules from .agentignore
 sync-agent-ignore:

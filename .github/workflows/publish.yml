@@ -22,6 +22,7 @@ concurrency:
 
 env:
   PDFIUM_VERSION: "7881"
+  GH_REPO: ${{ github.repository }}
 
 jobs:
   release-please:
@@ -286,6 +287,7 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
           TAG_NAME: ${{ needs.prepare-release.outputs.tag_name }}
           VERSION: ${{ needs.prepare-release.outputs.version }}
           TARGET: ${{ matrix.target }}
@@ -305,6 +307,7 @@ jobs:
       - name: Aggregate and Upload SHA256SUMS.txt
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
           TAG_NAME: ${{ needs.prepare-release.outputs.tag_name }}
         run: |
           set -euo pipefail

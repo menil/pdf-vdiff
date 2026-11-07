@@ -139,14 +139,12 @@ jobs:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
             pdfium_archive: pdfium-linux-x64.tgz
-            pdfium_sha256: "1470e21b8b4a3b4ad7f85684e2da11d94f3b69a86d81dee11b9b6709d927ac1d"
             pdfium_lib_source: lib/libpdfium.so
             pdfium_lib_dest: libpdfium.so
             archive_ext: tar.gz
           - target: aarch64-unknown-linux-gnu
             os: ubuntu-latest
             pdfium_archive: pdfium-linux-arm64.tgz
-            pdfium_sha256: "ee7f7b7d5468958336a818c1cd580bdd20972846b7377b13f9a923d92d1d4674"
             pdfium_lib_source: lib/libpdfium.so
             pdfium_lib_dest: libpdfium.so
             archive_ext: tar.gz
@@ -154,21 +152,18 @@ jobs:
           - target: x86_64-apple-darwin
             os: macos-latest
             pdfium_archive: pdfium-mac-x64.tgz
-            pdfium_sha256: "6dedf83990e0e3d6b7c93c9e7589c5a126b0ae14b7464d76120cff7a26afb18b"
             pdfium_lib_source: lib/libpdfium.dylib
             pdfium_lib_dest: libpdfium.dylib
             archive_ext: tar.gz
           - target: aarch64-apple-darwin
             os: macos-latest
             pdfium_archive: pdfium-mac-arm64.tgz
-            pdfium_sha256: "52e94ca5aa8847934330daf3f8150c190682c5ca93831468794f8b90d4392e40"
             pdfium_lib_source: lib/libpdfium.dylib
             pdfium_lib_dest: libpdfium.dylib
             archive_ext: tar.gz
           - target: x86_64-pc-windows-msvc
             os: windows-latest
             pdfium_archive: pdfium-win-x64.tgz
-            pdfium_sha256: "73cc0de638ac2095e7445bf56a38200a5b7c7ca0e9f4ba144598f2457377ac08"
             pdfium_lib_source: bin/pdfium.dll
             pdfium_lib_dest: pdfium.dll
             archive_ext: zip
@@ -202,10 +197,10 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.prepare-release.outputs.version }}
           TARGET: ${{ matrix.target }}
           PDFIUM_ARCHIVE: ${{ matrix.pdfium_archive }}
-          PDFIUM_SHA256: ${{ matrix.pdfium_sha256 }}
           PDFIUM_LIB_SOURCE: ${{ matrix.pdfium_lib_source }}
           PDFIUM_LIB_DEST: ${{ matrix.pdfium_lib_dest }}
         run: |
@@ -216,16 +211,27 @@ jobs:
           # Copy executable
           cp "target/${TARGET}/release/pdf-vdiff" "${DIR_NAME}/"
 
-          # Fetch and cryptographically verify matching PDFium binary
-          # Placing the library adjacent to the binary allows executable-directory resolution
-          # to find it portably without requiring system-level library installation.
-          curl -fsSL --retry 5 --retry-connrefused --retry-delay 2 \
-            "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium/${PDFIUM_VERSION}/${PDFIUM_ARCHIVE}" \
-            -o pdfium.tgz
+          # Resolve expected cryptographic digest dynamically from bblanchon/pdfium-binaries
+          EXPECTED_SHA=$(gh release view "chromium/${PDFIUM_VERSION}" \
+            --repo bblanchon/pdfium-binaries \
+            --json assets \
+            --jq ".assets[] | select(.name == \"${PDFIUM_ARCHIVE}\") | .digest" | sed 's/^sha256://')
+          if [ -z "${EXPECTED_SHA}" ]; then
+            echo "Failed to resolve upstream SHA256 digest for ${PDFIUM_ARCHIVE}" >&2
+            exit 1
+          fi
+
+          # Download PDFium archive
+          gh release download "chromium/${PDFIUM_VERSION}" \
+            --repo bblanchon/pdfium-binaries \
+            --pattern "${PDFIUM_ARCHIVE}" \
+            --output pdfium.tgz
+
+          # Cryptographically verify downloaded archive
           if command -v sha256sum >/dev/null 2>&1; then
-            echo "${PDFIUM_SHA256}  pdfium.tgz" | sha256sum -c -
+            echo "${EXPECTED_SHA}  pdfium.tgz" | sha256sum -c -
           else
-            echo "${PDFIUM_SHA256}  pdfium.tgz" | shasum -a 256 -c -
+            echo "${EXPECTED_SHA}  pdfium.tgz" | shasum -a 256 -c -
           fi
           tar -xzf pdfium.tgz "${PDFIUM_LIB_SOURCE}"
           cp "${PDFIUM_LIB_SOURCE}" "${DIR_NAME}/${PDFIUM_LIB_DEST}"
@@ -248,10 +254,10 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION: ${{ needs.prepare-release.outputs.version }}
           TARGET: ${{ matrix.target }}
           PDFIUM_ARCHIVE: ${{ matrix.pdfium_archive }}
-          PDFIUM_SHA256: ${{ matrix.pdfium_sha256 }}
           PDFIUM_LIB_SOURCE: ${{ matrix.pdfium_lib_source }}
           PDFIUM_LIB_DEST: ${{ matrix.pdfium_lib_dest }}
         run: |
@@ -261,12 +267,20 @@ jobs:
           # Copy executable
           Copy-Item "target\$env:TARGET\release\pdf-vdiff.exe" "$DirName\"
 
-          # Fetch and verify matching PDFium binary
-          $Url = "https://github.com/bblanchon/pdfium-binaries/releases/download/chromium/$env:PDFIUM_VERSION/$env:PDFIUM_ARCHIVE"
-          Invoke-WebRequest -Uri $Url -OutFile "pdfium.tgz" -MaximumRetryCount 5 -RetryIntervalSec 2
+          # Resolve expected cryptographic digest dynamically from bblanchon/pdfium-binaries
+          $ExpectedSha = (gh release view "chromium/$env:PDFIUM_VERSION" --repo bblanchon/pdfium-binaries --json assets --jq ".assets[] | select(.name == `"$env:PDFIUM_ARCHIVE`") | .digest").Replace("sha256:", "")
+          if ([string]::IsNullOrWhiteSpace($ExpectedSha)) {
+            Write-Error "Failed to resolve upstream SHA256 digest for $env:PDFIUM_ARCHIVE"
+            exit 1
+          }
+
+          # Download PDFium archive
+          gh release download "chromium/$env:PDFIUM_VERSION" --repo bblanchon/pdfium-binaries --pattern "$env:PDFIUM_ARCHIVE" --output "pdfium.tgz"
+
+          # Cryptographically verify downloaded archive
           $ActualHash = (Get-FileHash -Algorithm SHA256 "pdfium.tgz").Hash.ToLower()
-          if ($ActualHash -ne $env:PDFIUM_SHA256.ToLower()) {
-            Write-Error "PDFium checksum mismatch! Expected: $env:PDFIUM_SHA256, got: $ActualHash"
+          if ($ActualHash -ne $ExpectedSha.ToLower()) {
+            Write-Error "PDFium checksum mismatch! Expected: $ExpectedSha, got: $ActualHash"
             exit 1
           }
           tar -xzf pdfium.tgz "$env:PDFIUM_LIB_SOURCE"

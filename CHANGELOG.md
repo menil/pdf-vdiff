@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.7](https://github.com/menil/pdf-vdiff/compare/pdf-vdiff-v0.1.6...pdf-vdiff-v0.1.7) (2026-11-07)
+
+
+### Bug Fixes
+
+* **ci:** verify PDFium release digest dynamically from upstream ([3df74ed](https://github.com/menil/pdf-vdiff/commit/3df74ed9f6fe9c590dad85de9763cf845fbd392d))
+
 ## [0.1.6](https://github.com/menil/pdf-vdiff/compare/pdf-vdiff-v0.1.5...pdf-vdiff-v0.1.6) (2026-11-07)
 
 

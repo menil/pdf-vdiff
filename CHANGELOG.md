@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.6](https://github.com/menil/pdf-vdiff/compare/pdf-vdiff-v0.1.5...pdf-vdiff-v0.1.6) (2026-11-07)
+
+
+### Bug Fixes
+
+* **ci:** set GH_REPO in publish workflow for release checksums ([dd54473](https://github.com/menil/pdf-vdiff/commit/dd544732ca7dbe196d400e38619f52d82a0066f5))
+* **packaging:** make generate-assets optional with required-features ([5be7cf3](https://github.com/menil/pdf-vdiff/commit/5be7cf3f66c04cc918e4ce0359d19392c455df11))
+* upgrade pdfium to build 8125 and bump pdfium-render ([c14b643](https://github.com/menil/pdf-vdiff/commit/c14b643deece0b02a521bf4979018fdbc39e6282))
+
 ## [0.1.5](https://github.com/menil/pdf-vdiff/compare/pdf-vdiff-v0.1.4...pdf-vdiff-v0.1.5) (2026-11-07)
 
 

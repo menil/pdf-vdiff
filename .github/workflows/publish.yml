@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  PDFIUM_VERSION: "7881"
+  PDFIUM_VERSION: "8125"
   GH_REPO: ${{ github.repository }}
 
 jobs:

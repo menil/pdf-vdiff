@@ -1,27 +1,27 @@
 { lib, stdenv, fetchurl, autoPatchelfHook ? null }:
 
 let
-  pdfiumVersion = "7881";
+  pdfiumVersion = "8125";
 
   pdfiumPlatform =
     if stdenv.hostPlatform.isDarwin && stdenv.hostPlatform.isAarch64 then {
       name = "pdfium-mac-arm64.tgz";
-      sha256 = "52e94ca5aa8847934330daf3f8150c190682c5ca93831468794f8b90d4392e40";
+      sha256 = "4939bd935ac83ddc09a3a4f038bc43a19cea1660316a3667f26cb07a070e139d";
       ext = "dylib";
     }
     else if stdenv.hostPlatform.isDarwin && stdenv.hostPlatform.isx86_64 then {
       name = "pdfium-mac-x64.tgz";
-      sha256 = "6dedf83990e0e3d6b7c93c9e7589c5a126b0ae14b7464d76120cff7a26afb18b";
+      sha256 = "8a5193535b80c7215d8932f6647ae5097465b6dba2811602c21e120c2af112b0";
       ext = "dylib";
     }
     else if stdenv.hostPlatform.isLinux && stdenv.hostPlatform.isAarch64 then {
       name = "pdfium-linux-arm64.tgz";
-      sha256 = "ee7f7b7d5468958336a818c1cd580bdd20972846b7377b13f9a923d92d1d4674";
+      sha256 = "8b8818f2ec57d1b213d952ca6d7f0ffeca9d0110487d0e20ad83ba918bc92efa";
       ext = "so";
     }
     else if stdenv.hostPlatform.isLinux && stdenv.hostPlatform.isx86_64 then {
       name = "pdfium-linux-x64.tgz";
-      sha256 = "1470e21b8b4a3b4ad7f85684e2da11d94f3b69a86d81dee11b9b6709d927ac1d";
+      sha256 = "e1c3ce6e270cb5e0c20816b379ad9f2c1309972697c505f508de92bf5e7d6659";
       ext = "so";
     }
     else throw "Unsupported platform for pdfium: ${stdenv.hostPlatform.system}";

@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.7](https://github.com/menil/pdf-vdiff/compare/pdf-vdiff-v0.1.6...pdf-vdiff-v0.1.7) (2026-11-24)
+
+
+### Bug Fixes
+
+* **ci:** verify PDFium release digest dynamically from upstream ([3df74ed](https://github.com/menil/pdf-vdiff/commit/3df74ed9f6fe9c590dad85de9763cf845fbd392d))
+* report PasswordProtected for encrypted PDFs ([b9b6b68](https://github.com/menil/pdf-vdiff/commit/b9b6b68d75438f4e053634afbbca456f503a88fd)), closes [#63](https://github.com/menil/pdf-vdiff/issues/63)
+
 ## [0.1.6](https://github.com/menil/pdf-vdiff/compare/pdf-vdiff-v0.1.5...pdf-vdiff-v0.1.6) (2026-11-07)
 
 

@@ -123,6 +123,39 @@ fn test_integration_no_text_layer_error() {
 }
 
 #[test]
+fn test_integration_password_protected_error() {
+    let dir = fixtures_dir();
+    let out_dir = tempfile::tempdir().expect("tempdir");
+    let locked = out_dir.path().join("locked.pdf");
+    let out = out_dir.path().join("locked_diff.pdf");
+
+    // Minimal PDF with a standard security handler; the empty password does not unlock it.
+    let hex = format!("<{}>", "00".repeat(32));
+    let id = format!("<{}>", "00".repeat(16));
+    let body = [
+        "%PDF-1.4".to_string(),
+        "1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj".to_string(),
+        "2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj".to_string(),
+        "3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] >>\nendobj".to_string(),
+        format!("4 0 obj\n<< /Filter /Standard /V 1 /R 2 /O {hex} /U {hex} /P -4 >>\nendobj"),
+        format!("trailer\n<< /Root 1 0 R /Size 5 /Encrypt 4 0 R /ID [{id} {id}] >>"),
+        "%%EOF\n".to_string(),
+    ]
+    .join("\n");
+    std::fs::write(&locked, body).expect("write locked pdf");
+
+    let mut cmd = Command::cargo_bin("pdf-vdiff").unwrap();
+    cmd.arg(&locked)
+        .arg(dir.join("identical_target.pdf"))
+        .arg("-o")
+        .arg(&out)
+        .assert()
+        .failure()
+        .code(2)
+        .stderr(predicate::str::contains("is password-protected"));
+}
+
+#[test]
 fn test_integration_file_not_found_error() {
     let dir = fixtures_dir();
     let target = dir.join("edit_target.pdf");

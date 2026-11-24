@@ -6,7 +6,22 @@ use pdf_vdiff::diff::diff_documents;
 use pdf_vdiff::error::PdfVdiffError;
 use pdf_vdiff::layout::{CanvasLayout, PageDimensions};
 use pdf_vdiff::pdf::{extract_document_tokens, init_pdfium, CanvasCompositor, HeaderMetadata};
+use pdfium_render::prelude::{PdfiumError, PdfiumInternalError};
 use std::process::ExitCode;
+
+/// Maps a PDFium load failure to the matching domain error.
+fn open_error(path: &std::path::Path, err: PdfiumError) -> PdfVdiffError {
+    if matches!(
+        err,
+        PdfiumError::PdfiumLibraryInternalError(PdfiumInternalError::PasswordError)
+    ) {
+        return PdfVdiffError::PasswordProtected(path.to_path_buf());
+    }
+    PdfVdiffError::PdfOpen {
+        path: path.to_path_buf(),
+        reason: err.to_string(),
+    }
+}
 
 /// Core execution routine for CLI invocation.
 pub fn run(args: CliArgs) -> Result<i32, PdfVdiffError> {
@@ -61,21 +76,13 @@ pub fn run(args: CliArgs) -> Result<i32, PdfVdiffError> {
     let pdfium = init_pdfium()?;
 
     // 3. Load input documents
-    let base_doc =
-        pdfium
-            .load_pdf_from_file(base_pdf, None)
-            .map_err(|e| PdfVdiffError::PdfOpen {
-                path: base_pdf.clone(),
-                reason: e.to_string(),
-            })?;
+    let base_doc = pdfium
+        .load_pdf_from_file(base_pdf, None)
+        .map_err(|e| open_error(base_pdf, e))?;
 
-    let tailored_doc =
-        pdfium
-            .load_pdf_from_file(tailored_pdf, None)
-            .map_err(|e| PdfVdiffError::PdfOpen {
-                path: tailored_pdf.clone(),
-                reason: e.to_string(),
-            })?;
+    let tailored_doc = pdfium
+        .load_pdf_from_file(tailored_pdf, None)
+        .map_err(|e| open_error(tailored_pdf, e))?;
 
     // 4. Extract tokens from documents
     let base_pages = extract_document_tokens(&base_doc, args.max_pages)?;

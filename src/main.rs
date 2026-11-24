@@ -13,7 +13,7 @@ use std::process::ExitCode;
 fn open_error(path: &std::path::Path, err: PdfiumError) -> PdfVdiffError {
     match err {
         PdfiumError::PdfiumLibraryInternalError(PdfiumInternalError::PasswordError) => {
-            PdfVdiffError::PasswordProtected(path.to_path_buf())
+            PdfVdiffError::EncryptedPdf(path.to_path_buf())
         }
         e => PdfVdiffError::PdfOpen {
             path: path.to_path_buf(),
@@ -455,7 +455,7 @@ mod tests {
     }
 
     #[test]
-    fn test_run_password_protected_pdf() {
+    fn test_run_encrypted_pdf() {
         let temp_dir = tempfile::tempdir().expect("tempdir");
         let base = temp_dir.path().join("locked.pdf");
         let tailored = temp_dir.path().join("valid.pdf");
@@ -492,8 +492,8 @@ mod tests {
 
         let res = run(args);
         match res.unwrap_err() {
-            PdfVdiffError::PasswordProtected(p) => assert_eq!(p, base),
-            other => panic!("Expected PasswordProtected, got {:?}", other),
+            PdfVdiffError::EncryptedPdf(p) => assert_eq!(p, base),
+            other => panic!("Expected EncryptedPdf, got {:?}", other),
         }
     }
 

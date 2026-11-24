@@ -15,7 +15,7 @@ pub enum PdfVdiffError {
     PdfOpen { path: PathBuf, reason: String },
 
     #[error("PDF '{0}' is password-protected. Please provide an unlocked document.")]
-    PasswordProtected(PathBuf),
+    EncryptedPdf(PathBuf),
 
     #[error("PDF '{0}' contains no extractable text layer. Text-based diffing requires OCR text.")]
     NoTextLayer(PathBuf),

@@ -10,7 +10,13 @@ permissions:
 
 jobs:
   review:
-    if: github.actor != 'dependabot[bot]'
+    # The implementation workflow reviews its own pull requests (branches agent/issue-N from
+    # this repository), so the click that approves their other checks must not start a second
+    # review. A fork cannot skip its review by naming a branch like that.
+    if: >-
+      github.actor != 'dependabot[bot]'
+      && !(startsWith(github.head_ref, 'agent/issue-')
+        && github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:

@@ -1,6 +1,6 @@
 # Lets a maintainer ask for an issue to be assessed and, if it is real and reproducible,
 # fixed as a DRAFT pull request, with the actions from menil/pr-code-review-action
-# (pinned to the v1.6.0 commit). Read "Issue implementation" in that repository's README
+# (pinned to the v1.7.0 commit). Read "Issue implementation" in that repository's README
 # first. It needs the repository setting "Allow GitHub Actions to create and approve pull
 # requests", it uses the Claude subscription token, and the model only ever runs the
 # commands named below.
@@ -59,7 +59,7 @@ jobs:
 
       - name: Assess the issue
         id: assess
-        uses: menil/pr-code-review-action/implement/assess@8dac5610659f39bb9a53c127568fe4f9a9d036a6 # v1.6.0
+        uses: menil/pr-code-review-action/implement/assess@ac7c6ddd260d5cadd5a64bfdb07d1125f2eec4bc # v1.7.0
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           issue_number: ${{ github.event.issue.number }}
@@ -87,14 +87,14 @@ jobs:
       - name: Write the assessment
         id: report
         if: needs.assess.outputs.capped != 'true'
-        uses: menil/pr-code-review-action/implement/report@8dac5610659f39bb9a53c127568fe4f9a9d036a6 # v1.6.0
+        uses: menil/pr-code-review-action/implement/report@ac7c6ddd260d5cadd5a64bfdb07d1125f2eec4bc # v1.7.0
         with:
           issue_number: ${{ github.event.issue.number }}
           verdict: ${{ needs.assess.outputs.verdict }}
 
       - name: Say the daily limit was reached
         if: needs.assess.outputs.capped == 'true'
-        uses: menil/pr-code-review-action/implement/notify@8dac5610659f39bb9a53c127568fe4f9a9d036a6 # v1.6.0
+        uses: menil/pr-code-review-action/implement/notify@ac7c6ddd260d5cadd5a64bfdb07d1125f2eec4bc # v1.7.0
         with:
           issue_number: ${{ github.event.issue.number }}
           kind: capped
@@ -124,7 +124,7 @@ jobs:
 
       - name: Fix the issue and open a draft pull request
         id: fix
-        uses: menil/pr-code-review-action/implement/fix@8dac5610659f39bb9a53c127568fe4f9a9d036a6 # v1.6.0
+        uses: menil/pr-code-review-action/implement/fix@ac7c6ddd260d5cadd5a64bfdb07d1125f2eec4bc # v1.7.0
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           issue_number: ${{ github.event.issue.number }}
@@ -172,12 +172,30 @@ jobs:
           fi
 
       - name: Review the pull request
-        uses: menil/pr-code-review-action@8dac5610659f39bb9a53c127568fe4f9a9d036a6 # v1.6.0
+        uses: menil/pr-code-review-action@ac7c6ddd260d5cadd5a64bfdb07d1125f2eec4bc # v1.7.0
         with:
           provider: 'auto'
           pull_request_number: ${{ steps.pr.outputs.number }}
           openrouter_api_key: ${{ secrets.OPENROUTER_API_KEY }}
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+  # Tidies the issue once the pull request is open: takes off ready-to-implement, puts on
+  # pr-open and leaves one comment with the link. Fixed labels and text, no model, and only
+  # the permission to write to issues. A failure here does not fail the run.
+  finish:
+    needs: fix
+    if: needs.fix.outputs.pull_request != ''
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: Tidy the issue
+        uses: menil/pr-code-review-action/implement/finish@ac7c6ddd260d5cadd5a64bfdb07d1125f2eec4bc # v1.7.0
+        with:
+          issue_number: ${{ github.event.issue.number }}
+          pull_request_url: ${{ needs.fix.outputs.pull_request }}
 
   # One comment, once per issue, if any stage above failed, so a failure is not silent.
   notify:
@@ -189,7 +207,7 @@ jobs:
       issues: write
     steps:
       - name: Say the run failed
-        uses: menil/pr-code-review-action/implement/notify@8dac5610659f39bb9a53c127568fe4f9a9d036a6 # v1.6.0
+        uses: menil/pr-code-review-action/implement/notify@ac7c6ddd260d5cadd5a64bfdb07d1125f2eec4bc # v1.7.0
         with:
           issue_number: ${{ github.event.issue.number }}
           kind: failed

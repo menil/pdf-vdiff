@@ -129,6 +129,9 @@ jobs:
           # The tests, and the formatting and clippy checks, so the change can be made to
           # pass what the project's own validation will ask.
           command_tools: "Bash(nix-shell --run 'just test'),Bash(nix-shell --run 'just lint')"
+          # Writing a failing test, fixing, then running the tests and lint took 25 turns on
+          # the first real run; the default of 20 stopped it with the work unfinished.
+          max_turns: 40
           repository_notes: |
             pdf-vdiff is a Rust command line tool that compares two PDFs visually. The code
             is in src/, integration tests are in tests/ and sample PDFs are in example/.

@@ -6,7 +6,21 @@ use pdf_vdiff::diff::diff_documents;
 use pdf_vdiff::error::PdfVdiffError;
 use pdf_vdiff::layout::{CanvasLayout, PageDimensions};
 use pdf_vdiff::pdf::{extract_document_tokens, init_pdfium, CanvasCompositor, HeaderMetadata};
+use pdfium_render::prelude::{PdfiumError, PdfiumInternalError};
 use std::process::ExitCode;
+
+/// Maps a PDFium load failure to the matching domain error.
+fn open_error(path: &std::path::Path, err: PdfiumError) -> PdfVdiffError {
+    match err {
+        PdfiumError::PdfiumLibraryInternalError(PdfiumInternalError::PasswordError) => {
+            PdfVdiffError::PasswordProtected(path.to_path_buf())
+        }
+        e => PdfVdiffError::PdfOpen {
+            path: path.to_path_buf(),
+            reason: e.to_string(),
+        },
+    }
+}
 
 /// Core execution routine for CLI invocation.
 pub fn run(args: CliArgs) -> Result<i32, PdfVdiffError> {
@@ -61,21 +75,13 @@ pub fn run(args: CliArgs) -> Result<i32, PdfVdiffError> {
     let pdfium = init_pdfium()?;
 
     // 3. Load input documents
-    let base_doc =
-        pdfium
-            .load_pdf_from_file(base_pdf, None)
-            .map_err(|e| PdfVdiffError::PdfOpen {
-                path: base_pdf.clone(),
-                reason: e.to_string(),
-            })?;
+    let base_doc = pdfium
+        .load_pdf_from_file(base_pdf, None)
+        .map_err(|e| open_error(base_pdf, e))?;
 
-    let tailored_doc =
-        pdfium
-            .load_pdf_from_file(tailored_pdf, None)
-            .map_err(|e| PdfVdiffError::PdfOpen {
-                path: tailored_pdf.clone(),
-                reason: e.to_string(),
-            })?;
+    let tailored_doc = pdfium
+        .load_pdf_from_file(tailored_pdf, None)
+        .map_err(|e| open_error(tailored_pdf, e))?;
 
     // 4. Extract tokens from documents
     let base_pages = extract_document_tokens(&base_doc, args.max_pages)?;
@@ -445,6 +451,49 @@ mod tests {
         match res.unwrap_err() {
             PdfVdiffError::NoTextLayer(p) => assert_eq!(p, base),
             other => panic!("Expected NoTextLayer, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_run_password_protected_pdf() {
+        let temp_dir = tempfile::tempdir().expect("tempdir");
+        let base = temp_dir.path().join("locked.pdf");
+        let tailored = temp_dir.path().join("valid.pdf");
+
+        // The /O and /U entries do not match an empty password, so pdfium asks for one.
+        let locked = format!(
+            "%PDF-1.4\n\
+             1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n\
+             2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n\
+             3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] >>\nendobj\n\
+             4 0 obj\n<< /Filter /Standard /V 1 /R 2 /O <{0}> /U <{0}> /P -4 >>\nendobj\n\
+             trailer\n<< /Size 5 /Root 1 0 R /Encrypt 4 0 R /ID [<{1}> <{1}>] >>\n%%EOF\n",
+            "11".repeat(32),
+            "22".repeat(16),
+        );
+        std::fs::write(&base, locked).expect("write locked");
+        write_test_pdf(&tailored, &["Valid content"]);
+
+        let args = CliArgs {
+            base_pdf: Some(base.clone()),
+            tailored_pdf: Some(tailored),
+            output: None,
+            force: true,
+            open: false,
+            theme: ThemeKind::IntelliJ,
+            granularity: pdf_vdiff::diff::DiffGranularity::Word,
+            gutter_width: 24.0,
+            no_header: false,
+            max_pages: 250,
+            verbose: false,
+            generate_completions: None,
+            generate_man: false,
+        };
+
+        let res = run(args);
+        match res.unwrap_err() {
+            PdfVdiffError::PasswordProtected(p) => assert_eq!(p, base),
+            other => panic!("Expected PasswordProtected, got {:?}", other),
         }
     }
 

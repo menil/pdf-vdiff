@@ -1,6 +1,6 @@
 # Lets a maintainer ask for an issue to be assessed and, if it is real and reproducible,
 # fixed as a DRAFT pull request, with the actions from menil/pr-code-review-action
-# (pinned to the v1.3.0 commit). Read "Issue implementation" in that repository's README
+# (pinned to the v1.5.0 commit). Read "Issue implementation" in that repository's README
 # first. It needs the repository setting "Allow GitHub Actions to create and approve pull
 # requests", it uses the Claude subscription token, and the model only ever runs the
 # commands named below.
@@ -59,7 +59,7 @@ jobs:
 
       - name: Assess the issue
         id: assess
-        uses: menil/pr-code-review-action/implement/assess@7adc9f3fc99ed256281776ce34603b2b5cc28ac5 # v1.4.0
+        uses: menil/pr-code-review-action/implement/assess@b81f629b442f2523b55e9987be6a6973b400fa32 # v1.5.0
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           issue_number: ${{ github.event.issue.number }}
@@ -87,14 +87,14 @@ jobs:
       - name: Write the assessment
         id: report
         if: needs.assess.outputs.capped != 'true'
-        uses: menil/pr-code-review-action/implement/report@7adc9f3fc99ed256281776ce34603b2b5cc28ac5 # v1.4.0
+        uses: menil/pr-code-review-action/implement/report@b81f629b442f2523b55e9987be6a6973b400fa32 # v1.5.0
         with:
           issue_number: ${{ github.event.issue.number }}
           verdict: ${{ needs.assess.outputs.verdict }}
 
       - name: Say the daily limit was reached
         if: needs.assess.outputs.capped == 'true'
-        uses: menil/pr-code-review-action/implement/notify@7adc9f3fc99ed256281776ce34603b2b5cc28ac5 # v1.4.0
+        uses: menil/pr-code-review-action/implement/notify@b81f629b442f2523b55e9987be6a6973b400fa32 # v1.5.0
         with:
           issue_number: ${{ github.event.issue.number }}
           kind: capped
@@ -109,6 +109,8 @@ jobs:
       contents: write
       pull-requests: write
       issues: read
+    outputs:
+      pull_request: ${{ steps.fix.outputs.pull_request_url }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v7
@@ -121,7 +123,8 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
 
       - name: Fix the issue and open a draft pull request
-        uses: menil/pr-code-review-action/implement/fix@7adc9f3fc99ed256281776ce34603b2b5cc28ac5 # v1.4.0
+        id: fix
+        uses: menil/pr-code-review-action/implement/fix@b81f629b442f2523b55e9987be6a6973b400fa32 # v1.5.0
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           issue_number: ${{ github.event.issue.number }}
@@ -140,6 +143,42 @@ jobs:
             formatting and clippy with `nix-shell --run 'just lint'`, exactly like that.
             Add a regression test next to the existing ones for any behaviour you change.
 
+  # Reviews the draft pull request the fix opened. It is opened with the workflow's own
+  # token, so this repository's own review workflow waits for a click ("Approve and run")
+  # and skips these branches; the review runs here instead, on the pull request's diff only.
+  # Nothing from the pull request is checked out, and a failed review does not fail the run.
+  review:
+    needs: fix
+    if: needs.fix.outputs.pull_request != ''
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - name: Find the pull request number
+        id: pr
+        env:
+          URL: ${{ needs.fix.outputs.pull_request }}
+        run: |
+          set -euo pipefail
+          # Only the exact form of a pull request URL; anything else stops here.
+          if [[ "$URL" =~ ^https://github\.com/[^/]+/[^/]+/pull/([0-9]+)$ ]]; then
+            echo "number=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::The fix did not report a pull request URL."
+            exit 1
+          fi
+
+      - name: Review the pull request
+        uses: menil/pr-code-review-action@b81f629b442f2523b55e9987be6a6973b400fa32 # v1.5.0
+        with:
+          provider: 'auto'
+          pull_request_number: ${{ steps.pr.outputs.number }}
+          openrouter_api_key: ${{ secrets.OPENROUTER_API_KEY }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
   # One comment, once per issue, if any stage above failed, so a failure is not silent.
   notify:
     needs: [assess, report, fix]
@@ -150,7 +189,7 @@ jobs:
       issues: write
     steps:
       - name: Say the run failed
-        uses: menil/pr-code-review-action/implement/notify@7adc9f3fc99ed256281776ce34603b2b5cc28ac5 # v1.4.0
+        uses: menil/pr-code-review-action/implement/notify@b81f629b442f2523b55e9987be6a6973b400fa32 # v1.5.0
         with:
           issue_number: ${{ github.event.issue.number }}
           kind: failed

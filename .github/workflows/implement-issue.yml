@@ -59,7 +59,7 @@ jobs:
 
       - name: Assess the issue
         id: assess
-        uses: menil/pr-code-review-action/implement/assess@a1aa172600e2df2c3f39fbca2fb5346e408c847f # v1.3.0
+        uses: menil/pr-code-review-action/implement/assess@7adc9f3fc99ed256281776ce34603b2b5cc28ac5 # v1.4.0
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           issue_number: ${{ github.event.issue.number }}
@@ -87,14 +87,14 @@ jobs:
       - name: Write the assessment
         id: report
         if: needs.assess.outputs.capped != 'true'
-        uses: menil/pr-code-review-action/implement/report@a1aa172600e2df2c3f39fbca2fb5346e408c847f # v1.3.0
+        uses: menil/pr-code-review-action/implement/report@7adc9f3fc99ed256281776ce34603b2b5cc28ac5 # v1.4.0
         with:
           issue_number: ${{ github.event.issue.number }}
           verdict: ${{ needs.assess.outputs.verdict }}
 
       - name: Say the daily limit was reached
         if: needs.assess.outputs.capped == 'true'
-        uses: menil/pr-code-review-action/implement/notify@a1aa172600e2df2c3f39fbca2fb5346e408c847f # v1.3.0
+        uses: menil/pr-code-review-action/implement/notify@7adc9f3fc99ed256281776ce34603b2b5cc28ac5 # v1.4.0
         with:
           issue_number: ${{ github.event.issue.number }}
           kind: capped
@@ -121,7 +121,7 @@ jobs:
           nix_path: nixpkgs=channel:nixos-unstable
 
       - name: Fix the issue and open a draft pull request
-        uses: menil/pr-code-review-action/implement/fix@a1aa172600e2df2c3f39fbca2fb5346e408c847f # v1.3.0
+        uses: menil/pr-code-review-action/implement/fix@7adc9f3fc99ed256281776ce34603b2b5cc28ac5 # v1.4.0
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           issue_number: ${{ github.event.issue.number }}
@@ -147,7 +147,7 @@ jobs:
       issues: write
     steps:
       - name: Say the run failed
-        uses: menil/pr-code-review-action/implement/notify@a1aa172600e2df2c3f39fbca2fb5346e408c847f # v1.3.0
+        uses: menil/pr-code-review-action/implement/notify@7adc9f3fc99ed256281776ce34603b2b5cc28ac5 # v1.4.0
         with:
           issue_number: ${{ github.event.issue.number }}
           kind: failed

@@ -30,6 +30,7 @@ struct LineCluster {
     y_center: f32,
     y0: f32,
     y1: f32,
+    y_samples: usize,   // Number of tokens averaged into `y_center`
     tokens: Vec<usize>, // Token indices
 }
 
@@ -196,7 +197,8 @@ fn cluster_column_lines(
             line.y0 = line.y0.min(t.bounds.y0);
             line.y1 = line.y1.max(t.bounds.y1);
             if t.bounds.height() > MIN_BASELINE_GLYPH_HEIGHT {
-                let count = line.tokens.len() as f32;
+                line.y_samples += 1;
+                let count = line.y_samples as f32;
                 line.y_center = ((line.y_center * (count - 1.0)) + y_center) / count;
             }
         } else {
@@ -204,6 +206,7 @@ fn cluster_column_lines(
                 y_center,
                 y0: t.bounds.y0,
                 y1: t.bounds.y1,
+                y_samples: 1,
                 tokens: vec![token_idx],
             });
         }
@@ -341,6 +344,34 @@ mod tests {
 
         assert_eq!(tokens[3].text, "Right-2");
         assert_eq!(tokens[3].column_index, 1);
+    }
+
+    #[test]
+    fn test_small_glyphs_do_not_skew_baseline_average() {
+        let token = |y0: f32, y1: f32| {
+            TextToken::new(
+                "x".to_string(),
+                "x".to_string(),
+                Rect::new(0.0, y0, 5.0, y1),
+                0,
+                0,
+                0,
+                true,
+            )
+        };
+        // Tall glyph centered at 100, three small glyphs (e.g. punctuation), then a tall glyph centered at 103.
+        let tokens = vec![
+            token(95.0, 105.0),
+            token(99.0, 101.0),
+            token(99.0, 101.0),
+            token(99.0, 101.0),
+            token(98.0, 108.0),
+        ];
+        let lines = cluster_column_lines(&tokens, &[0, 1, 2, 3, 4], 2.0);
+
+        assert_eq!(lines.len(), 1);
+        // Only the two tall glyphs contribute: (100 + 103) / 2
+        assert!((lines[0].y_center - 101.5).abs() < 1e-3);
     }
 
     #[test]

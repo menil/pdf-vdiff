@@ -1,6 +1,6 @@
 # Lets a maintainer ask for an issue to be assessed and, if it is real and reproducible,
 # fixed as a pull request, ready for review, by the shared workflow of
-# menil/pr-code-review-action (pinned to the v1.8.0 commit). Read "Issue implementation" in that
+# menil/issue-and-pr-agent-actions (called by @v1, the latest 1.x release). Read "Issue implementation" in that
 # repository's README first. It needs the repository setting "Allow GitHub Actions to create
 # and approve pull requests", it uses the Claude subscription token, and the model only ever
 # runs the commands named below.
@@ -10,8 +10,8 @@
 # AGENT_AUTO to true; it is off. Add the no-agent label to keep the agent off an issue.
 #
 # The jobs, the guard and what each job may touch are in that shared workflow, so this file
-# changes only for this repository's own settings, and for the version on the `uses:` line,
-# which Dependabot bumps.
+# changes only for this repository's own settings. To hold a fixed version instead of @v1, call
+# the full commit of a release, with the release in a comment; Dependabot can then bump it.
 name: Implement issue
 
 on:
@@ -34,7 +34,7 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
-    uses: menil/pr-code-review-action/.github/workflows/implement.yml@e221ab244b89b41b39abf18d9d37fa4ecdc6c825 # v1.8.0
+    uses: menil/issue-and-pr-agent-actions/.github/workflows/implement.yml@v1
     with:
       agent_auto: ${{ vars.AGENT_AUTO }}
       daily_cap: ${{ vars.AGENT_DAILY_CAP }}
